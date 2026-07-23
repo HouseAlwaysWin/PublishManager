@@ -110,4 +110,24 @@ public class SemVerServiceTests
         Assert.False(result.HadPrevious);
         Assert.Equal(expected, result.NextTag);
     }
+
+    [Theory]
+    [InlineData("1.2.3", "v", "1.2.3")]     // prefix optional
+    [InlineData("v1.2.3", "v", "1.2.3")]    // prefix present
+    [InlineData("2.0.0-rc.1", "v", "2.0.0-rc.1")]
+    public void ParseVersion_Lenient_Valid(string input, string prefix, string expected)
+    {
+        var version = _sut.ParseVersion(input, prefix);
+        Assert.NotNull(version);
+        Assert.Equal(expected, version!.ToString());
+    }
+
+    [Theory]
+    [InlineData("not-a-version", "v")]
+    [InlineData("1.2", "v")]
+    [InlineData("", "v")]
+    public void ParseVersion_Invalid_ReturnsNull(string input, string prefix)
+    {
+        Assert.Null(_sut.ParseVersion(input, prefix));
+    }
 }

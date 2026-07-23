@@ -92,17 +92,23 @@
                             <StackPanel Spacing="12">
                                 <TextBlock Text="發版" FontWeight="Bold" FontSize="15" />
 
-                                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10">
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                         <TextBlock Text="目前:" Opacity="0.7" />
                                         <TextBlock Text="{Binding Release.CurrentVersion}" FontWeight="SemiBold" />
                                     </StackPanel>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding Release.Bumps}"
-                                              SelectedItem="{Binding Release.Bump}" MinWidth="110" />
-                                    <TextBlock Grid.Column="2" Text="→" VerticalAlignment="Center" Opacity="0.6" />
-                                    <TextBlock Grid.Column="3" Text="{Binding Release.NextVersionPreview}"
-                                               FontWeight="SemiBold" VerticalAlignment="Center" />
-                                </Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <CheckBox Content="手動指定版號" IsChecked="{Binding Release.UseManualVersion}"
+                                                  VerticalAlignment="Center" />
+                                        <ComboBox ItemsSource="{Binding Release.Bumps}" SelectedItem="{Binding Release.Bump}"
+                                                  MinWidth="110" IsVisible="{Binding !Release.UseManualVersion}" />
+                                        <TextBox Text="{Binding Release.ManualVersion}" MinWidth="130"
+                                                 PlaceholderText="例:1.2.3" IsVisible="{Binding Release.UseManualVersion}" />
+                                        <TextBlock Text="→" VerticalAlignment="Center" Opacity="0.6" />
+                                        <TextBlock Text="{Binding Release.NextVersionPreview}"
+                                                   FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </StackPanel>
 
                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                     <CheckBox Content="Dry-run(不推送 / 不觸發)" IsChecked="{Binding Release.DryRun}"

@@ -54,6 +54,18 @@ public sealed class SemVerService : ISemVerService
 
     public string ToTag(SemVersion version, string prefix = "v") => prefix + version;
 
+    public SemVersion? ParseVersion(string input, string prefix = "v")
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return null;
+
+        var s = input.Trim();
+        if (!string.IsNullOrEmpty(prefix) && s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            s = s[prefix.Length..];
+
+        return SemVersion.TryParse(s, SemVersionStyles.Strict, out var version) ? version : null;
+    }
+
     public NextVersionResult ComputeNextFromTags(
         IEnumerable<string> tags,
         VersionBump bump,

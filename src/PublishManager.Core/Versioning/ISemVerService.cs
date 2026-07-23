@@ -26,6 +26,13 @@ public interface ISemVerService
     string ToTag(SemVersion version, string prefix = "v");
 
     /// <summary>
+    /// Leniently parses a user-entered version for a manual release. The
+    /// <paramref name="prefix"/> is optional in the input ("2.0.0" and "v2.0.0"
+    /// both parse). Returns null if the value is not valid SemVer.
+    /// </summary>
+    SemVersion? ParseVersion(string input, string prefix = "v");
+
+    /// <summary>
     /// Convenience for the UI/orchestrator: from a repo's existing tags, produce
     /// the current tag (if any) and the proposed next tag as strings. When no
     /// tags exist yet, the base version is 0.0.0 (so a first patch → 0.0.1,

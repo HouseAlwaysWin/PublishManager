@@ -27,7 +27,10 @@ public partial class ProjectEditorWindow : Window
         {
             var path = folders[0].TryGetLocalPath();
             if (!string.IsNullOrEmpty(path))
+            {
                 vm.LocalPath = path;
+                vm.SuggestNameFromPathIfEmpty();
+            }
         }
     }
 

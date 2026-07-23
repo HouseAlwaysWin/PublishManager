@@ -66,6 +66,8 @@ public partial class ReleaseViewModel : ViewModelBase
     [ObservableProperty] private string? _branch;
     [ObservableProperty] private VersionBump _bump;
     [ObservableProperty] private string? _nextVersionPreview;
+    [ObservableProperty] private bool _useManualVersion;
+    [ObservableProperty] private string _manualVersion = string.Empty;
     [ObservableProperty] private bool _dryRun;
     [ObservableProperty][NotifyCanExecuteChangedFor(nameof(ReleaseCommand))] private bool _isReleasing;
     [ObservableProperty] private string? _statusMessage;
@@ -85,12 +87,16 @@ public partial class ReleaseViewModel : ViewModelBase
         CurrentVersion = null;
         Branch = null;
         NextVersionPreview = null;
+        UseManualVersion = false;
+        ManualVersion = string.Empty;
         Bump = project?.DefaultBump ?? VersionBump.Patch;
 
         _ = LoadInfoAsync();
     }
 
     partial void OnBumpChanged(VersionBump value) => _ = UpdatePreviewAsync();
+    partial void OnUseManualVersionChanged(bool value) => _ = UpdatePreviewAsync();
+    partial void OnManualVersionChanged(string value) => _ = UpdatePreviewAsync();
 
     private async Task LoadInfoAsync()
     {
@@ -126,6 +132,15 @@ public partial class ReleaseViewModel : ViewModelBase
 
         try
         {
+            if (UseManualVersion)
+            {
+                var version = _semver.ParseVersion(ManualVersion, project.TagPrefix);
+                NextVersionPreview = version is null
+                    ? "(版號格式不正確)"
+                    : _semver.ToTag(version, project.TagPrefix);
+                return;
+            }
+
             var tags = await _git.ListTagsAsync(project.LocalPath);
             NextVersionPreview = _semver.ComputeNextFromTags(tags, Bump, project.TagPrefix).NextTag;
         }
@@ -156,7 +171,13 @@ public partial class ReleaseViewModel : ViewModelBase
 
         try
         {
-            var request = new ReleaseRequest { Project = project, Bump = Bump, DryRun = DryRun };
+            var request = new ReleaseRequest
+            {
+                Project = project,
+                Bump = Bump,
+                ExplicitVersion = UseManualVersion ? ManualVersion : null,
+                DryRun = DryRun,
+            };
             var result = await _orchestrator.RunAsync(request, events, log, _cts.Token);
 
             StatusMessage = result.Success

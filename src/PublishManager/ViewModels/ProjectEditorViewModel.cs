@@ -77,13 +77,26 @@ public partial class ProjectEditorViewModel : ViewModelBase
         SelectedStep = Steps.LastOrDefault();
     }
 
+    /// <summary>If the name is still blank, derive it from the local path's folder name.</summary>
+    public void SuggestNameFromPathIfEmpty()
+    {
+        if (!string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(LocalPath))
+            return;
+
+        try
+        {
+            var folder = new DirectoryInfo(LocalPath.Trim()).Name;
+            if (!string.IsNullOrEmpty(folder))
+                Name = folder;
+        }
+        catch
+        {
+            // ignore malformed paths
+        }
+    }
+
     public bool Validate(out string? error)
     {
-        if (string.IsNullOrWhiteSpace(Name))
-        {
-            error = "請輸入專案名稱。";
-            return false;
-        }
         if (string.IsNullOrWhiteSpace(LocalPath))
         {
             error = "請選擇專案的本機路徑。";
@@ -92,6 +105,15 @@ public partial class ProjectEditorViewModel : ViewModelBase
         if (!Directory.Exists(LocalPath))
         {
             error = "本機路徑不存在。";
+            return false;
+        }
+
+        // Fall back to the folder name when the user left the name blank.
+        SuggestNameFromPathIfEmpty();
+
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            error = "請輸入專案名稱。";
             return false;
         }
         error = null;
