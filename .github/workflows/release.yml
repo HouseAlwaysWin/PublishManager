@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore PublishManager.slnx
+
+      - name: Build (Release)
+        run: dotnet build PublishManager.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test PublishManager.slnx -c Release --no-build
+
+      - name: Summary
+        run: echo "Released ${{ github.ref_name }}"
