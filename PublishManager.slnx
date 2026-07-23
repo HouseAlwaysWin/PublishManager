@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PublishManager.Core/PublishManager.Core.csproj" />
+    <Project Path="src/PublishManager/PublishManager.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PublishManager.Tests/PublishManager.Tests.csproj" />
+  </Folder>
+</Solution>

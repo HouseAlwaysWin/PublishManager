@@ -1,0 +1,153 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PublishManager.ViewModels"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="720"
+        x:Class="PublishManager.Views.ProjectEditorWindow"
+        x:DataType="vm:ProjectEditorViewModel"
+        Width="640" Height="740"
+        WindowStartupLocation="CenterOwner"
+        Title="{Binding Title}">
+
+    <DockPanel Margin="16">
+
+        <!-- Footer: error + actions -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding Error}"
+                       Foreground="#E53935"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding Error, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+            <Button Grid.Column="1" Content="取消" Click="OnCancelClick" Margin="0,0,8,0" MinWidth="80" />
+            <Button Grid.Column="2" Content="儲存" Click="OnSaveClick" MinWidth="80"
+                    Classes="accent" />
+        </Grid>
+
+        <ScrollViewer>
+            <StackPanel Spacing="10">
+
+                <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="專案名稱" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding Name}" PlaceholderText="My App" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="本機路徑" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Text="{Binding LocalPath}" PlaceholderText="D:\DotNetProjects\MyApp" />
+                        <Button Grid.Column="1" Content="瀏覽…" Click="OnBrowseClick" Margin="8,0,0,0" />
+                    </Grid>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="專案類型" FontWeight="SemiBold" />
+                        <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock Text="發版模型" FontWeight="SemiBold" />
+                        <ComboBox ItemsSource="{Binding ReleaseModels}" SelectedItem="{Binding ReleaseModel}" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Tag 前綴" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding TagPrefix}" PlaceholderText="v" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock Text="預設版號遞增" FontWeight="SemiBold" />
+                        <ComboBox ItemsSource="{Binding Bumps}" SelectedItem="{Binding DefaultBump}" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="發版分支" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding ReleaseBranch}" PlaceholderText="留空 = 使用目前 checkout 的分支" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Owner（可留空）" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding Owner}" PlaceholderText="從 git remote 推導" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock Text="Repo（可留空）" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding Repo}" PlaceholderText="從 git remote 推導" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Workflow 檔（觸發 / 監看用）" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding WorkflowFile}" PlaceholderText="release.yml" />
+                </StackPanel>
+
+                <CheckBox Content=".NET：本機 build 時帶入版號（-p:Version=）"
+                          IsChecked="{Binding StampVersionIntoBuild}" />
+
+                <!-- Steps editor -->
+                <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,4,0,0">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock Grid.Column="0" Text="發版步驟（本機腳本）" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="新增步驟" Command="{Binding AddStepCommand}" Margin="0,0,6,0" />
+                            <Button Grid.Column="2" Content="移除選取" Command="{Binding RemoveStepCommand}" />
+                        </Grid>
+
+                        <ListBox ItemsSource="{Binding Steps}" SelectedItem="{Binding SelectedStep}" MaxHeight="140">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ReleaseStepViewModel">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Interpreter}" Opacity="0.6" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Border IsVisible="{Binding SelectedStep, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
+                                Background="#11808080" CornerRadius="4" Padding="10">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="步驟名稱" FontWeight="SemiBold" />
+                                        <TextBox Text="{Binding SelectedStep.Name}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="Interpreter" FontWeight="SemiBold" />
+                                        <ComboBox ItemsSource="{Binding SelectedStep.Interpreters}"
+                                                  SelectedItem="{Binding SelectedStep.Interpreter}"
+                                                  HorizontalAlignment="Stretch" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="指令 / 腳本" FontWeight="SemiBold" />
+                                    <TextBox Text="{Binding SelectedStep.Command}"
+                                             AcceptsReturn="True" TextWrapping="Wrap"
+                                             MinHeight="60"
+                                             PlaceholderText="PowerShell/Bash 腳本內容，或 Executable 的執行檔路徑" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="引數（僅 Executable，空白分隔）" FontWeight="SemiBold" />
+                                    <TextBox Text="{Binding SelectedStep.ArgumentsText}" PlaceholderText="build -c Release" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="工作目錄（留空 = 專案路徑）" FontWeight="SemiBold" />
+                                    <TextBox Text="{Binding SelectedStep.WorkingDirectory}" />
+                                </StackPanel>
+                                <CheckBox Content="失敗時繼續（不中止發版）"
+                                          IsChecked="{Binding SelectedStep.ContinueOnError}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

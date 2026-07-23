@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch PublishManager",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/PublishManager/bin/Debug/net10.0/PublishManager.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/PublishManager",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}

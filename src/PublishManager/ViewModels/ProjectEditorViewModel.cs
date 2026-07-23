@@ -1,0 +1,118 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using PublishManager.Core.Models;
+using PublishManager.Core.Versioning;
+
+namespace PublishManager.ViewModels;
+
+/// <summary>Backing view model for the add/edit project dialog.</summary>
+public partial class ProjectEditorViewModel : ViewModelBase
+{
+    private readonly Guid _id;
+    private readonly Dictionary<string, string> _dispatchInputs;
+
+    public ProjectEditorViewModel() : this(null) { }
+
+    public ProjectEditorViewModel(Project? existing)
+    {
+        var p = existing ?? new Project();
+        _id = p.Id;
+        _dispatchInputs = new Dictionary<string, string>(p.DispatchInputs);
+
+        _name = p.Name;
+        _localPath = p.LocalPath;
+        _kind = p.Kind;
+        _releaseModel = p.ReleaseModel;
+        _tagPrefix = p.TagPrefix;
+        _defaultBump = p.DefaultBump;
+        _releaseBranch = p.ReleaseBranch ?? string.Empty;
+        _owner = p.Owner ?? string.Empty;
+        _repo = p.Repo ?? string.Empty;
+        _workflowFile = p.WorkflowFile ?? string.Empty;
+        _stampVersionIntoBuild = p.StampVersionIntoBuild;
+
+        Steps = new ObservableCollection<ReleaseStepViewModel>(
+            p.Steps.Select(s => new ReleaseStepViewModel(s)));
+
+        Title = existing is null ? "新增專案" : "編輯專案";
+    }
+
+    public string Title { get; }
+
+    [ObservableProperty] private string _name;
+    [ObservableProperty] private string _localPath;
+    [ObservableProperty] private ProjectKind _kind;
+    [ObservableProperty] private ReleaseModel _releaseModel;
+    [ObservableProperty] private string _tagPrefix;
+    [ObservableProperty] private VersionBump _defaultBump;
+    [ObservableProperty] private string _releaseBranch;
+    [ObservableProperty] private string _owner;
+    [ObservableProperty] private string _repo;
+    [ObservableProperty] private string _workflowFile;
+    [ObservableProperty] private bool _stampVersionIntoBuild;
+    [ObservableProperty] private ReleaseStepViewModel? _selectedStep;
+    [ObservableProperty] private string? _error;
+
+    public ObservableCollection<ReleaseStepViewModel> Steps { get; }
+
+    public ProjectKind[] Kinds { get; } = Enum.GetValues<ProjectKind>();
+    public ReleaseModel[] ReleaseModels { get; } = Enum.GetValues<ReleaseModel>();
+    public VersionBump[] Bumps { get; } = Enum.GetValues<VersionBump>();
+
+    [RelayCommand]
+    private void AddStep()
+    {
+        var step = new ReleaseStepViewModel(new ReleaseStep { Name = "new-step" });
+        Steps.Add(step);
+        SelectedStep = step;
+    }
+
+    [RelayCommand]
+    private void RemoveStep()
+    {
+        if (SelectedStep is null)
+            return;
+        Steps.Remove(SelectedStep);
+        SelectedStep = Steps.LastOrDefault();
+    }
+
+    public bool Validate(out string? error)
+    {
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            error = "請輸入專案名稱。";
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(LocalPath))
+        {
+            error = "請選擇專案的本機路徑。";
+            return false;
+        }
+        if (!Directory.Exists(LocalPath))
+        {
+            error = "本機路徑不存在。";
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
+    public Project BuildProject() => new()
+    {
+        Id = _id,
+        Name = Name.Trim(),
+        LocalPath = LocalPath.Trim(),
+        Kind = Kind,
+        ReleaseModel = ReleaseModel,
+        TagPrefix = string.IsNullOrWhiteSpace(TagPrefix) ? "v" : TagPrefix.Trim(),
+        DefaultBump = DefaultBump,
+        ReleaseBranch = string.IsNullOrWhiteSpace(ReleaseBranch) ? null : ReleaseBranch.Trim(),
+        Owner = string.IsNullOrWhiteSpace(Owner) ? null : Owner.Trim(),
+        Repo = string.IsNullOrWhiteSpace(Repo) ? null : Repo.Trim(),
+        WorkflowFile = string.IsNullOrWhiteSpace(WorkflowFile) ? null : WorkflowFile.Trim(),
+        StampVersionIntoBuild = StampVersionIntoBuild,
+        Steps = [.. Steps.Select(s => s.ToModel())],
+        DispatchInputs = _dispatchInputs,
+    };
+}

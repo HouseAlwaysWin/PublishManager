@@ -1,0 +1,151 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PublishManager.ViewModels"
+        xmlns:models="using:PublishManager.Core.Models"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:views="using:PublishManager.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="680"
+        x:Class="PublishManager.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Width="1040" Height="700"
+        Title="PublishManager — GitHub Action 發版管理">
+
+    <Grid ColumnDefinitions="320,*">
+
+        <!-- Sidebar: project list -->
+        <DockPanel Grid.Column="0" Margin="10">
+            <TextBlock DockPanel.Dock="Top" Text="專案" FontSize="16" FontWeight="Bold" Margin="4,2,4,10" />
+
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="4,10,4,2">
+                <Button Content="新增" Command="{Binding AddProjectCommand}" />
+                <Button Content="編輯" Command="{Binding EditProjectCommand}" />
+                <Button Content="移除" Command="{Binding RemoveProjectCommand}" />
+            </StackPanel>
+
+            <ListBox ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:Project">
+                        <StackPanel Spacing="2" Margin="2">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding LocalPath}" FontSize="11" Opacity="0.6"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Detail -->
+        <Border Grid.Column="1" Background="#0A808080" BorderBrush="#22808080" BorderThickness="1,0,0,0">
+            <Panel>
+                <!-- Empty state -->
+                <TextBlock Text="請從左側新增或選擇一個專案"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Opacity="0.5" FontSize="15"
+                           IsVisible="{Binding SelectedProject, Converter={x:Static conv:ObjectConverters.IsNull}}" />
+
+                <!-- Selected project -->
+                <ScrollViewer IsVisible="{Binding SelectedProject, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+                    <StackPanel Margin="20" Spacing="14">
+                        <TextBlock Text="{Binding SelectedProject.Name}" FontSize="22" FontWeight="Bold" />
+
+                        <Border Background="#11808080" CornerRadius="6" Padding="14">
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                  RowSpacing="8">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="本機路徑" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedProject.LocalPath}" TextWrapping="Wrap" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="專案類型" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedProject.Kind}" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="發版模型" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedProject.ReleaseModel}" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Tag 前綴 / 遞增" FontWeight="SemiBold" Opacity="0.7" />
+                                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="{Binding SelectedProject.TagPrefix}" />
+                                    <TextBlock Text="{Binding SelectedProject.DefaultBump}" Opacity="0.7" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Owner / Repo" FontWeight="SemiBold" Opacity="0.7" />
+                                <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding SelectedProject.Owner, TargetNullValue='（從 remote 推導）'}" />
+                                    <TextBlock Text="/" Opacity="0.4"
+                                               IsVisible="{Binding SelectedProject.Repo, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                                    <TextBlock Text="{Binding SelectedProject.Repo, TargetNullValue=''}" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Workflow 檔" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedProject.WorkflowFile, TargetNullValue='（未設定）'}" />
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="發版步驟數" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedProject.Steps.Count}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Release panel + GitHub Actions monitor -->
+                        <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="6" Padding="14"
+                                Background="#08808080">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="發版" FontWeight="Bold" FontSize="15" />
+
+                                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock Text="目前:" Opacity="0.7" />
+                                        <TextBlock Text="{Binding Release.CurrentVersion}" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding Release.Bumps}"
+                                              SelectedItem="{Binding Release.Bump}" MinWidth="110" />
+                                    <TextBlock Grid.Column="2" Text="→" VerticalAlignment="Center" Opacity="0.6" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Release.NextVersionPreview}"
+                                               FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <CheckBox Content="Dry-run(不推送 / 不觸發)" IsChecked="{Binding Release.DryRun}"
+                                              VerticalAlignment="Center" />
+                                    <Button Content="發版" Command="{Binding Release.ReleaseCommand}" Classes="accent" />
+                                    <Button Content="取消" Command="{Binding Release.CancelCommand}"
+                                            IsVisible="{Binding Release.IsReleasing}" />
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding Release.StatusMessage}" TextWrapping="Wrap"
+                                           IsVisible="{Binding Release.StatusMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+                                <ItemsControl ItemsSource="{Binding Release.Stages}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ReleaseStageViewModel">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,1">
+                                                <TextBlock Text="{Binding Glyph}" Width="16" />
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Width="94" />
+                                                <TextBlock Text="{Binding Message}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBox Text="{Binding Release.LogText, Mode=OneWay}"
+                                         IsVisible="{Binding Release.LogText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}"
+                                         IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                                         FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12" MaxHeight="180"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+
+                                <Border IsVisible="{Binding Release.Monitor.HasRun}"
+                                        BorderBrush="#33808080" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="GitHub Actions" FontWeight="Bold" />
+                                        <views:WorkflowRunMonitorView DataContext="{Binding Release.Monitor}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Panel>
+        </Border>
+    </Grid>
+</Window>
