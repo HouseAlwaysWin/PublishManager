@@ -1,8 +1,8 @@
-# .NET build output
+# .NET build output (SDK-style: everything lands under bin/ and obj/).
+# NOTE: do NOT add [Dd]ebug/ or [Rr]elease/ — those also match source folders
+# named Debug/Release (e.g. src/PublishManager.Core/Release/).
 bin/
 obj/
-[Dd]ebug/
-[Rr]elease/
 *.user
 
 # Rider / VS
