@@ -69,7 +69,13 @@ public sealed record RunQuery
 {
     public required string Owner { get; init; }
     public required string Repo { get; init; }
-    public required string WorkflowFile { get; init; }
+
+    /// <summary>
+    /// Workflow file to filter by. When null/empty, runs are matched across all
+    /// workflows (by event + head_sha) — lets tag-push monitoring work without
+    /// the user configuring a workflow file.
+    /// </summary>
+    public string? WorkflowFile { get; init; }
 
     /// <summary>GitHub event that triggers the run ("push" for tags, "workflow_dispatch" for dispatch).</summary>
     public required string Event { get; init; }

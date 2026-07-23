@@ -161,14 +161,22 @@ public sealed class ReleaseOrchestrator(
 
             // ---- Locate the triggered run ----
             long? runId = null;
-            if (!dry && slug is not null && !string.IsNullOrWhiteSpace(project.WorkflowFile))
+            if (!dry)
             {
-                Report(events, "LocateRun", ReleaseStageStatus.Running);
-                var query = await BuildRunQueryAsync(project, slug.Value, nextTag, branch, since, ct);
-                runId = await _github.FindRunAsync(query, ct);
-                Report(events, "LocateRun",
-                    runId is not null ? ReleaseStageStatus.Succeeded : ReleaseStageStatus.Failed,
-                    runId is not null ? $"run #{runId}" : "找不到觸發的 run(可稍後於 GitHub 查看)");
+                if (slug is null)
+                {
+                    Report(events, "LocateRun", ReleaseStageStatus.Skipped,
+                        "無法解析 owner/repo,略過監看(可在專案設定填 Owner/Repo)");
+                }
+                else
+                {
+                    Report(events, "LocateRun", ReleaseStageStatus.Running);
+                    var query = await BuildRunQueryAsync(project, slug.Value, nextTag, branch, since, ct);
+                    runId = await _github.FindRunAsync(query, ct);
+                    Report(events, "LocateRun",
+                        runId is not null ? ReleaseStageStatus.Succeeded : ReleaseStageStatus.Failed,
+                        runId is not null ? $"run #{runId}" : "找不到觸發的 run(可稍後於 GitHub 查看)");
+                }
             }
 
             return new ReleaseResult
@@ -267,7 +275,7 @@ public sealed class ReleaseOrchestrator(
             {
                 Owner = slug.Owner,
                 Repo = slug.Repo,
-                WorkflowFile = project.WorkflowFile!,
+                WorkflowFile = string.IsNullOrWhiteSpace(project.WorkflowFile) ? null : project.WorkflowFile,
                 Event = "push",
                 HeadSha = commit,
                 Since = since,

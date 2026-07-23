@@ -80,9 +80,13 @@ public sealed class GitHubActionsService(IGitHubAuthProvider auth, ILogger<GitHu
 
             try
             {
-                var response = await client.Actions.Workflows.Runs
-                    .ListByWorkflow(query.Owner, query.Repo, query.WorkflowFile, request, options)
-                    .ConfigureAwait(false);
+                // With a workflow file, filter to it; otherwise match across all
+                // workflows (by event + head_sha) so monitoring works unconfigured.
+                var response = string.IsNullOrWhiteSpace(query.WorkflowFile)
+                    ? await client.Actions.Workflows.Runs
+                        .List(query.Owner, query.Repo, request, options).ConfigureAwait(false)
+                    : await client.Actions.Workflows.Runs
+                        .ListByWorkflow(query.Owner, query.Repo, query.WorkflowFile, request, options).ConfigureAwait(false);
 
                 var match = response.WorkflowRuns
                     .Where(r => r.CreatedAt >= cutoff)

@@ -209,6 +209,24 @@ public class ReleaseOrchestratorTests
         Assert.Contains("版號格式不正確", result.Error);
         Assert.Empty(_git.CreatedTags);
     }
+
+    [Fact]
+    public async Task TagPush_NoWorkflowFile_StillLocatesRunByHeadSha()
+    {
+        _git.Tags = ["v1.0.0"];
+        _github.RunIdToReturn = 77;
+        var project = TagPushProject();
+        project.WorkflowFile = null;   // workflow file not configured
+        var request = new ReleaseRequest { Project = project, Bump = VersionBump.Patch };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(77, result.RunId);
+        var query = Assert.Single(_github.Queries);
+        Assert.Null(query.WorkflowFile);   // matched across all workflows
+        Assert.Equal("push", query.Event);
+    }
 }
 
 // ---- Hand-rolled fakes (no mocking framework) ----
