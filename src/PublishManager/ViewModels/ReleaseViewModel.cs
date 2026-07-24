@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -15,16 +16,29 @@ public partial class ReleaseStageViewModel(string name) : ViewModelBase
 {
     public string Name { get; } = name;
 
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(Glyph))] private ReleaseStageStatus _status;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Glyph))]
+    [NotifyPropertyChangedFor(nameof(GlyphBrush))]
+    private ReleaseStageStatus _status;
+
     [ObservableProperty] private string? _message;
 
     public string Glyph => Status switch
     {
         ReleaseStageStatus.Succeeded => "✓",
         ReleaseStageStatus.Failed => "✗",
-        ReleaseStageStatus.Running => "▶",
+        ReleaseStageStatus.Running => "●",
         ReleaseStageStatus.Skipped => "–",
-        _ => "•",
+        _ => "○",
+    };
+
+    public IBrush GlyphBrush => Status switch
+    {
+        ReleaseStageStatus.Succeeded => RunGlyph.Success,
+        ReleaseStageStatus.Failed => RunGlyph.Failure,
+        ReleaseStageStatus.Running => RunGlyph.Running,
+        ReleaseStageStatus.Skipped => RunGlyph.Muted,
+        _ => RunGlyph.Pending,
     };
 }
 

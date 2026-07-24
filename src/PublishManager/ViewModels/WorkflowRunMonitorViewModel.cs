@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using PublishManager.Core.GitHub;
@@ -29,14 +30,22 @@ public partial class WorkflowRunMonitorViewModel : ViewModelBase
     [ObservableProperty] private bool _hasRun;
     [ObservableProperty] private bool _isMonitoring;
     [ObservableProperty] private string? _runName;
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(StatusGlyph))] private RunStatus _status;
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(StatusGlyph))] private RunConclusion _conclusion;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusGlyph))]
+    [NotifyPropertyChangedFor(nameof(StatusBrush))]
+    private RunStatus _status;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusGlyph))]
+    [NotifyPropertyChangedFor(nameof(StatusBrush))]
+    private RunConclusion _conclusion;
     [ObservableProperty] private string? _htmlUrl;
     [ObservableProperty] private string _logText = string.Empty;
 
     public ObservableCollection<JobLineViewModel> Jobs { get; } = [];
 
     public string StatusGlyph => RunGlyph.For(Status, Conclusion);
+    public IBrush StatusBrush => RunGlyph.BrushFor(Status, Conclusion);
 
     /// <summary>Begins monitoring the given run until it completes or is cancelled.</summary>
     public async Task MonitorAsync(string owner, string repo, long runId, CancellationToken external = default)

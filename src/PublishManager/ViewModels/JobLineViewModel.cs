@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using PublishManager.Core.GitHub;
 
@@ -18,10 +19,18 @@ public partial class StepLineViewModel : ViewModelBase
     public int Number { get; }
     public string Name { get; }
 
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(Glyph))] private RunStatus _status;
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(Glyph))] private RunConclusion _conclusion;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Glyph))]
+    [NotifyPropertyChangedFor(nameof(GlyphBrush))]
+    private RunStatus _status;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Glyph))]
+    [NotifyPropertyChangedFor(nameof(GlyphBrush))]
+    private RunConclusion _conclusion;
 
     public string Glyph => RunGlyph.For(Status, Conclusion);
+    public IBrush GlyphBrush => RunGlyph.BrushFor(Status, Conclusion);
 
     public void Update(StepSnapshot step)
     {
@@ -45,12 +54,20 @@ public partial class JobLineViewModel : ViewModelBase
     public long Id { get; }
     public string Name { get; }
 
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(Glyph))] private RunStatus _status;
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(Glyph))] private RunConclusion _conclusion;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Glyph))]
+    [NotifyPropertyChangedFor(nameof(GlyphBrush))]
+    private RunStatus _status;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Glyph))]
+    [NotifyPropertyChangedFor(nameof(GlyphBrush))]
+    private RunConclusion _conclusion;
 
     public ObservableCollection<StepLineViewModel> Steps { get; } = [];
 
     public string Glyph => RunGlyph.For(Status, Conclusion);
+    public IBrush GlyphBrush => RunGlyph.BrushFor(Status, Conclusion);
 
     public void Update(JobSnapshot job)
     {
