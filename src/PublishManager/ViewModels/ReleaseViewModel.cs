@@ -55,6 +55,9 @@ public partial class ReleaseViewModel : ViewModelBase
     private readonly ILogger<ReleaseViewModel> _logger;
     private CancellationTokenSource? _cts;
 
+    /// <summary>Suppresses preview refreshes while <see cref="SetProject"/> resets fields.</summary>
+    private bool _suspendPreview;
+
     public ReleaseViewModel(
         IReleaseOrchestrator orchestrator,
         IGitService git,
@@ -91,26 +94,45 @@ public partial class ReleaseViewModel : ViewModelBase
     public void SetProject(Project? project)
     {
         CancelInternal();
-        Monitor.Stop();
 
-        Project = project;
-        HasProject = project is not null;
-        Stages.Clear();
-        LogText = string.Empty;
-        StatusMessage = null;
-        CurrentVersion = null;
-        Branch = null;
-        NextVersionPreview = null;
-        UseManualVersion = false;
-        ManualVersion = string.Empty;
-        Bump = project?.DefaultBump ?? VersionBump.Patch;
+        // Clear the monitor, not just stop it — otherwise the previous project's
+        // run stays on screen (frozen) under the newly selected project.
+        Monitor.Reset();
+
+        // Resetting these fields would otherwise fire several redundant,
+        // git-backed preview refreshes; LoadInfoAsync does the work once.
+        _suspendPreview = true;
+        try
+        {
+            Project = project;
+            HasProject = project is not null;
+            Stages.Clear();
+            LogText = string.Empty;
+            StatusMessage = null;
+            CurrentVersion = null;
+            Branch = null;
+            NextVersionPreview = null;
+            UseManualVersion = false;
+            ManualVersion = string.Empty;
+            Bump = project?.DefaultBump ?? VersionBump.Patch;
+        }
+        finally
+        {
+            _suspendPreview = false;
+        }
 
         _ = LoadInfoAsync();
     }
 
-    partial void OnBumpChanged(VersionBump value) => _ = UpdatePreviewAsync();
-    partial void OnUseManualVersionChanged(bool value) => _ = UpdatePreviewAsync();
-    partial void OnManualVersionChanged(string value) => _ = UpdatePreviewAsync();
+    partial void OnBumpChanged(VersionBump value) => RefreshPreview();
+    partial void OnUseManualVersionChanged(bool value) => RefreshPreview();
+    partial void OnManualVersionChanged(string value) => RefreshPreview();
+
+    private void RefreshPreview()
+    {
+        if (!_suspendPreview)
+            _ = UpdatePreviewAsync();
+    }
 
     private async Task LoadInfoAsync()
     {
@@ -122,15 +144,23 @@ public partial class ReleaseViewModel : ViewModelBase
         {
             if (!await _git.IsGitRepositoryAsync(project.LocalPath))
             {
-                CurrentVersion = "(非 git 儲存庫)";
+                if (IsStillCurrent(project))
+                    CurrentVersion = "(非 git 儲存庫)";
                 return;
             }
 
-            Branch = await _git.GetCurrentBranchAsync(project.LocalPath);
+            var branch = await _git.GetCurrentBranchAsync(project.LocalPath);
             var tags = await _git.ListTagsAsync(project.LocalPath);
+
+            // The user may have switched projects while we were awaiting git;
+            // don't overwrite the newly selected project's info with stale data.
+            if (!IsStillCurrent(project))
+                return;
+
+            Branch = branch;
             var latest = _semver.GetLatest(tags, project.TagPrefix);
             CurrentVersion = latest is null ? "(尚無 tag)" : _semver.ToTag(latest, project.TagPrefix);
-            NextVersionPreview = _semver.ComputeNextFromTags(tags, Bump, project.TagPrefix).NextTag;
+            NextVersionPreview = BuildPreview(project, tags);
         }
         catch (Exception ex)
         {
@@ -148,20 +178,30 @@ public partial class ReleaseViewModel : ViewModelBase
         {
             if (UseManualVersion)
             {
-                var version = _semver.ParseVersion(ManualVersion, project.TagPrefix);
-                NextVersionPreview = version is null
-                    ? "(版號格式不正確)"
-                    : _semver.ToTag(version, project.TagPrefix);
+                // A manual version needs no git round-trip.
+                NextVersionPreview = BuildPreview(project, []);
                 return;
             }
 
             var tags = await _git.ListTagsAsync(project.LocalPath);
-            NextVersionPreview = _semver.ComputeNextFromTags(tags, Bump, project.TagPrefix).NextTag;
+            if (IsStillCurrent(project))
+                NextVersionPreview = BuildPreview(project, tags);
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Preview update failed.");
         }
+    }
+
+    private bool IsStillCurrent(Project project) => ReferenceEquals(Project, project);
+
+    private string? BuildPreview(Project project, IReadOnlyList<string> tags)
+    {
+        if (!UseManualVersion)
+            return _semver.ComputeNextFromTags(tags, Bump, project.TagPrefix).NextTag;
+
+        var version = _semver.ParseVersion(ManualVersion, project.TagPrefix);
+        return version is null ? "(版號格式不正確)" : _semver.ToTag(version, project.TagPrefix);
     }
 
     private bool CanRelease => HasProject && !IsReleasing;
@@ -244,6 +284,23 @@ public partial class ReleaseViewModel : ViewModelBase
         stage.Message = e.Message;
     }
 
-    private void OnLogLine(ProcessLine line) =>
-        LogText += (line.IsError ? "[err] " : string.Empty) + line.Text + "\n";
+    /// <summary>
+    /// Appends a step-output line, keeping only the tail — a chatty build can
+    /// emit tens of thousands of lines, and the bound TextBox is not virtualized.
+    /// </summary>
+    private void OnLogLine(ProcessLine line)
+    {
+        var combined = LogText + (line.IsError ? "[err] " : string.Empty) + line.Text + "\n";
+
+        if (combined.Length > MaxLogChars)
+        {
+            var start = combined.Length - MaxLogChars;
+            var newline = combined.IndexOf('\n', start);
+            combined = "…(較早的輸出已截斷)…\n" + combined[(newline >= 0 ? newline + 1 : start)..];
+        }
+
+        LogText = combined;
+    }
+
+    private const int MaxLogChars = 80_000;
 }

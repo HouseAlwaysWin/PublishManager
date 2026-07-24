@@ -99,7 +99,12 @@ public partial class WorkflowRunMonitorViewModel : ViewModelBase
         catch (ObjectDisposedException) { }
     }
 
-    private void Reset()
+    /// <summary>
+    /// Stops polling and clears everything on display. Called when the selected
+    /// project changes — otherwise the previous project's run stays on screen,
+    /// frozen, and looks like it belongs to the newly selected project.
+    /// </summary>
+    public void Reset()
     {
         Stop();
         _cts?.Dispose();
@@ -112,6 +117,8 @@ public partial class WorkflowRunMonitorViewModel : ViewModelBase
         Status = RunStatus.Unknown;
         Conclusion = RunConclusion.None;
         HtmlUrl = null;
+        HasRun = false;
+        IsMonitoring = false;
     }
 
     private void Apply(WorkflowRunSnapshot snapshot)
@@ -147,7 +154,7 @@ public partial class WorkflowRunMonitorViewModel : ViewModelBase
             {
                 var log = await _actions.GetJobLogsAsync(owner, repo, job.Id, ct);
                 if (!string.IsNullOrWhiteSpace(log))
-                    LogText += $"\n===== {job.Name} =====\n{log.TrimEnd()}\n";
+                    AppendLog($"\n===== {job.Name} =====\n{log.TrimEnd()}\n");
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -156,4 +163,26 @@ public partial class WorkflowRunMonitorViewModel : ViewModelBase
             }
         }
     }
+
+    /// <summary>
+    /// Appends to the log, keeping only the tail. A single CI job log can be
+    /// 100KB+, and the bound TextBox is not virtualized — letting it grow
+    /// unbounded across jobs freezes the UI.
+    /// </summary>
+    private void AppendLog(string text)
+    {
+        var combined = LogText.Length == 0 ? text : LogText + text;
+
+        if (combined.Length > MaxLogChars)
+        {
+            var start = combined.Length - MaxLogChars;
+            var newline = combined.IndexOf('\n', start);
+            combined = TruncationNotice + combined[(newline >= 0 ? newline + 1 : start)..];
+        }
+
+        LogText = combined;
+    }
+
+    private const int MaxLogChars = 80_000;
+    private const string TruncationNotice = "…（較早的輸出已截斷,完整內容請按「在 GitHub 開啟」）…\n";
 }

@@ -41,16 +41,22 @@ public sealed class ProcessRunner(ILogger<ProcessRunner> logger) : IProcessRunne
 
         using var proc = new Process { StartInfo = psi };
 
-        try
+        // Starting a process is a blocking OS call (git.exe is notably slow to
+        // spawn on Windows). Never do it on the caller's thread — that is often
+        // the UI thread, and a handful of these in a row would freeze it.
+        await Task.Run(() =>
         {
-            if (!proc.Start())
-                throw new InvalidOperationException("Process.Start returned false.");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Failed to start process {FileName}", request.FileName);
-            throw new ProcessStartException(request.FileName, ex);
-        }
+            try
+            {
+                if (!proc.Start())
+                    throw new InvalidOperationException("Process.Start returned false.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to start process {FileName}", request.FileName);
+                throw new ProcessStartException(request.FileName, ex);
+            }
+        }, ct).ConfigureAwait(false);
 
         var stdout = new List<string>();
         var stderr = new List<string>();
