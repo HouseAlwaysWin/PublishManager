@@ -38,10 +38,13 @@
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="本機路徑" FontWeight="SemiBold" />
-                    <Grid ColumnDefinitions="*,Auto">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
                         <TextBox Grid.Column="0" Text="{Binding LocalPath}" PlaceholderText="D:\DotNetProjects\MyApp" />
                         <Button Grid.Column="1" Content="瀏覽…" Click="OnBrowseClick" Margin="8,0,0,0" />
+                        <Button Grid.Column="2" Content="自動偵測" Command="{Binding DetectCommand}" Margin="6,0,0,0" />
                     </Grid>
+                    <TextBlock Text="{Binding DetectSummary}" FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                               IsVisible="{Binding DetectSummary, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">

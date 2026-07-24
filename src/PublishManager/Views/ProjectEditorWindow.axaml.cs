@@ -30,6 +30,8 @@ public partial class ProjectEditorWindow : Window
             {
                 vm.LocalPath = path;
                 vm.SuggestNameFromPathIfEmpty();
+                // Fill in kind / owner / repo / tag prefix / workflow straight away.
+                await vm.DetectCommand.ExecuteAsync(null);
             }
         }
     }

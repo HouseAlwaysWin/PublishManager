@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PublishManager.Core.Detection;
 using PublishManager.Core.Models;
 using PublishManager.Core.Versioning;
 
@@ -11,11 +12,13 @@ public partial class ProjectEditorViewModel : ViewModelBase
 {
     private readonly Guid _id;
     private readonly Dictionary<string, string> _dispatchInputs;
+    private readonly IProjectDetector? _detector;
 
-    public ProjectEditorViewModel() : this(null) { }
+    public ProjectEditorViewModel() : this(null, null) { }
 
-    public ProjectEditorViewModel(Project? existing)
+    public ProjectEditorViewModel(Project? existing, IProjectDetector? detector = null)
     {
+        _detector = detector;
         var p = existing ?? new Project();
         _id = p.Id;
         _dispatchInputs = new Dictionary<string, string>(p.DispatchInputs);
@@ -75,6 +78,74 @@ public partial class ProjectEditorViewModel : ViewModelBase
             return;
         Steps.Remove(SelectedStep);
         SelectedStep = Steps.LastOrDefault();
+    }
+
+    [ObservableProperty] private bool _isDetecting;
+    [ObservableProperty] private string? _detectSummary;
+
+    /// <summary>
+    /// Infers settings from the local folder: project kind, owner/repo (git
+    /// remote), tag prefix (from existing tags), and the workflow file plus the
+    /// release model its triggers imply.
+    /// </summary>
+    [RelayCommand]
+    private async Task DetectAsync()
+    {
+        if (_detector is null || string.IsNullOrWhiteSpace(LocalPath))
+            return;
+
+        IsDetecting = true;
+        Error = null;
+        try
+        {
+            var detection = await _detector.DetectAsync(LocalPath.Trim());
+
+            SuggestNameFromPathIfEmpty();
+            Kind = detection.Kind;
+
+            if (detection.Slug is { } slug)
+            {
+                Owner = slug.Owner;
+                Repo = slug.Repo;
+            }
+            if (!string.IsNullOrEmpty(detection.TagPrefix))
+                TagPrefix = detection.TagPrefix;
+            if (!string.IsNullOrEmpty(detection.SuggestedWorkflowFile))
+                WorkflowFile = detection.SuggestedWorkflowFile;
+            if (detection.SuggestedReleaseModel is { } model)
+                ReleaseModel = model;
+
+            DetectSummary = BuildDetectSummary(detection);
+        }
+        catch (Exception ex)
+        {
+            DetectSummary = $"偵測失敗:{ex.Message}";
+        }
+        finally
+        {
+            IsDetecting = false;
+        }
+    }
+
+    private static string BuildDetectSummary(ProjectDetection detection)
+    {
+        var parts = new List<string>
+        {
+            detection.IsGitRepository ? "git ✓" : "非 git 儲存庫",
+            detection.Kind.ToString(),
+        };
+
+        if (detection.Slug is { } slug)
+            parts.Add($"{slug.Owner}/{slug.Repo}");
+        if (!string.IsNullOrEmpty(detection.CurrentBranch))
+            parts.Add($"分支 {detection.CurrentBranch}");
+
+        if (!string.IsNullOrEmpty(detection.SuggestedWorkflowFile))
+            parts.Add($"workflow {detection.SuggestedWorkflowFile}");
+        else if (detection.Workflows.Count == 0)
+            parts.Add("找不到 workflow");
+
+        return "偵測結果:" + string.Join("  ·  ", parts);
     }
 
     /// <summary>If the name is still blank, derive it from the local path's folder name.</summary>

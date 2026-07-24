@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using PublishManager.Core.Detection;
 using PublishManager.Core.Git;
 using PublishManager.Core.GitHub;
 using PublishManager.Core.Processes;
@@ -19,6 +20,7 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IGitService, GitService>();
         services.AddSingleton<ISemVerService, SemVerService>();
+        services.AddSingleton<IProjectDetector, ProjectDetector>();
 
         services.AddSingleton(StorageOptions.Default);
         services.AddSingleton<IProjectStore, JsonProjectStore>();
