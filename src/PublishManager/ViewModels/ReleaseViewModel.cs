@@ -91,30 +91,17 @@ public partial class ReleaseViewModel : ViewModelBase
     [ObservableProperty] private string _logText = string.Empty;
 
     /// <summary>Reconfigures the panel for a newly selected project (or clears it when null).</summary>
-    public void SetProject(Project? project)
+    /// <summary>Binds this panel to a project. Called once, when it is created for that project.</summary>
+    public void Initialize(Project project)
     {
-        CancelInternal();
-
-        // Clear the monitor, not just stop it — otherwise the previous project's
-        // run stays on screen (frozen) under the newly selected project.
-        Monitor.Reset();
-
-        // Resetting these fields would otherwise fire several redundant,
-        // git-backed preview refreshes; LoadInfoAsync does the work once.
+        // Setting these would otherwise fire several redundant, git-backed
+        // preview refreshes; LoadInfoAsync does the work once.
         _suspendPreview = true;
         try
         {
             Project = project;
-            HasProject = project is not null;
-            Stages.Clear();
-            LogText = string.Empty;
-            StatusMessage = null;
-            CurrentVersion = null;
-            Branch = null;
-            NextVersionPreview = null;
-            UseManualVersion = false;
-            ManualVersion = string.Empty;
-            Bump = project?.DefaultBump ?? VersionBump.Patch;
+            HasProject = true;
+            Bump = project.DefaultBump;
         }
         finally
         {
@@ -122,6 +109,34 @@ public partial class ReleaseViewModel : ViewModelBase
         }
 
         _ = LoadInfoAsync();
+    }
+
+    /// <summary>
+    /// Re-points at an edited copy of the same project. Deliberately keeps the
+    /// pipeline stages, log and any in-flight run monitor — they belong to this
+    /// project and must survive switching away and back.
+    /// </summary>
+    public void UpdateProject(Project project)
+    {
+        _suspendPreview = true;
+        try
+        {
+            Project = project;
+            HasProject = true;
+        }
+        finally
+        {
+            _suspendPreview = false;
+        }
+
+        _ = LoadInfoAsync();
+    }
+
+    /// <summary>Cancels any in-flight release and stops monitoring (project removed / closing).</summary>
+    public void Shutdown()
+    {
+        CancelInternal();
+        Monitor.Stop();
     }
 
     partial void OnBumpChanged(VersionBump value) => RefreshPreview();
@@ -216,7 +231,7 @@ public partial class ReleaseViewModel : ViewModelBase
         Stages.Clear();
         LogText = string.Empty;
         StatusMessage = null;
-        Monitor.Stop();
+        Monitor.Reset();   // clear the previous run before this project's new one
         IsReleasing = true;
         _cts = new CancellationTokenSource();
 

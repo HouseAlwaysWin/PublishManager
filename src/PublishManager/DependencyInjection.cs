@@ -11,7 +11,11 @@ public static class ViewModelServiceCollectionExtensions
     {
         services.AddSingleton<IDialogService, DialogService>();
         services.AddTransient<WorkflowRunMonitorViewModel>();
-        services.AddSingleton<ReleaseViewModel>();
+
+        // One release panel (and monitor) per project — created on demand.
+        services.AddTransient<ReleaseViewModel>();
+        services.AddSingleton<Func<ReleaseViewModel>>(sp => sp.GetRequiredService<ReleaseViewModel>);
+
         services.AddTransient<MainWindowViewModel>();
         return services;
     }

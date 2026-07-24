@@ -12,24 +12,32 @@ public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly IProjectStore _store;
     private readonly IDialogService _dialogs;
+    private readonly Func<ReleaseViewModel> _releaseFactory;
     private readonly ILogger<MainWindowViewModel> _logger;
+
+    /// <summary>One release panel per project, kept alive across selection changes.</summary>
+    private readonly Dictionary<Guid, ReleaseViewModel> _releases = [];
 
     public MainWindowViewModel(
         IProjectStore store,
         IDialogService dialogs,
-        ReleaseViewModel release,
+        Func<ReleaseViewModel> releaseFactory,
         ILogger<MainWindowViewModel> logger)
     {
         _store = store;
         _dialogs = dialogs;
-        Release = release;
+        _releaseFactory = releaseFactory;
         _logger = logger;
     }
 
     public ObservableCollection<Project> Projects { get; } = [];
 
-    /// <summary>Release panel bound to the currently selected project.</summary>
-    public ReleaseViewModel Release { get; }
+    /// <summary>
+    /// Release panel for the selected project. Each project keeps its own, so a
+    /// release (and its Actions monitor) started on one project keeps running —
+    /// and is still on screen — after switching away and back.
+    /// </summary>
+    [ObservableProperty] private ReleaseViewModel? _release;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EditProjectCommand))]
@@ -38,7 +46,27 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool HasSelection => SelectedProject is not null;
 
-    partial void OnSelectedProjectChanged(Project? value) => Release.SetProject(value);
+    partial void OnSelectedProjectChanged(Project? value)
+    {
+        if (value is null)
+        {
+            Release = null;
+            return;
+        }
+
+        if (_releases.TryGetValue(value.Id, out var existing))
+        {
+            // Same project (possibly an edited copy) — keep its stages/monitor.
+            existing.UpdateProject(value);
+            Release = existing;
+            return;
+        }
+
+        var created = _releaseFactory();
+        created.Initialize(value);
+        _releases[value.Id] = created;
+        Release = created;
+    }
 
     /// <summary>Loads persisted projects. Call once after the window opens.</summary>
     public async Task InitializeAsync()
@@ -91,6 +119,9 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (SelectedProject is null)
             return;
+
+        if (_releases.Remove(SelectedProject.Id, out var release))
+            release.Shutdown();
 
         Projects.Remove(SelectedProject);
         SelectedProject = Projects.FirstOrDefault();
