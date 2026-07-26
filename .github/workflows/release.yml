@@ -5,9 +5,13 @@ on:
     tags:
       - 'v*'
 
+# Required so the workflow can create a Release with GITHUB_TOKEN.
+permissions:
+  contents: write
+
 jobs:
-  build:
-    name: Build & Test
+  release:
+    name: Build, Test & Release
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -27,5 +31,19 @@ jobs:
       - name: Test
         run: dotnet test PublishManager.slnx -c Release --no-build
 
-      - name: Summary
-        run: echo "Released ${{ github.ref_name }}"
+      - name: Publish (win-x64, self-contained single file)
+        run: >
+          dotnet publish src/PublishManager/PublishManager.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish/win-x64
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $asset = 'publish/win-x64/PublishManager.exe'
+          $ghArgs = @('release', 'create', $tag, $asset, '--title', $tag, '--generate-notes')
+          if ($tag -match '-') { $ghArgs += '--prerelease' }
+          gh @ghArgs
