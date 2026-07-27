@@ -79,8 +79,11 @@ public partial class ReleaseViewModel : ViewModelBase
 
     public ObservableCollection<ReleaseProgressRowViewModel> Stages { get; } = [];
 
-    /// <summary>Branch names offered as release-source suggestions.</summary>
-    public ObservableCollection<string> Branches { get; } = [];
+    /// <summary>
+    /// Branches and tags offered as release-source suggestions — both are valid
+    /// sources. A commit sha is also accepted but cannot be suggested.
+    /// </summary>
+    public ObservableCollection<string> SourceSuggestions { get; } = [];
     public VersionBump[] Bumps { get; } = Enum.GetValues<VersionBump>();
 
     [ObservableProperty] private Project? _project;
@@ -186,9 +189,13 @@ public partial class ReleaseViewModel : ViewModelBase
                 return;
 
             Branch = branch;
-            Branches.Clear();
+
+            // Branches first — the common case — then tags, newest version first.
+            SourceSuggestions.Clear();
             foreach (var name in branches)
-                Branches.Add(name);
+                SourceSuggestions.Add(name);
+            foreach (var tag in OrderTagsNewestFirst(tags, project.TagPrefix))
+                SourceSuggestions.Add(tag);
             var latest = _semver.GetLatest(tags, project.TagPrefix);
             CurrentVersion = latest is null ? "(尚無 tag)" : _semver.ToTag(latest, project.TagPrefix);
             NextVersionPreview = BuildPreview(project, tags);
@@ -225,6 +232,27 @@ public partial class ReleaseViewModel : ViewModelBase
     }
 
     private bool IsStillCurrent(Project project) => ReferenceEquals(Project, project);
+
+    /// <summary>Version tags newest first; anything unparseable trails behind by name.</summary>
+    private IEnumerable<string> OrderTagsNewestFirst(IReadOnlyList<string> tags, string prefix) =>
+        tags.Select(t => (Tag: t, Version: _semver.TryParseTag(t, prefix)))
+            .OrderByDescending(x => x.Version is not null)
+            .ThenByDescending(x => x.Version, SemVersionOrder.Instance)
+            .ThenByDescending(x => x.Tag, StringComparer.Ordinal)
+            .Select(x => x.Tag);
+
+    private sealed class SemVersionOrder : IComparer<Semver.SemVersion?>
+    {
+        public static readonly SemVersionOrder Instance = new();
+
+        public int Compare(Semver.SemVersion? x, Semver.SemVersion? y) => (x, y) switch
+        {
+            (null, null) => 0,
+            (null, _) => -1,
+            (_, null) => 1,
+            _ => x.CompareSortOrderTo(y),
+        };
+    }
 
     private string? BuildPreview(Project project, IReadOnlyList<string> tags)
     {

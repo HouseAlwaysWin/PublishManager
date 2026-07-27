@@ -32,15 +32,30 @@ public sealed class GitService(IProcessRunner runner, ILogger<GitService> logger
 
     public async Task<IReadOnlyList<string>> ListBranchesAsync(string repoPath, CancellationToken ct = default)
     {
+        // The full refname is needed to spot symbolic pointers: refs/remotes/
+        // origin/HEAD abbreviates to plain "origin", which is a remote rather
+        // than anywhere a release can be cut from.
         var result = await RunCheckedAsync(repoPath, ct,
-            "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes").ConfigureAwait(false);
+            "for-each-ref", "--format=%(refname)\t%(refname:short)", "refs/heads", "refs/remotes")
+            .ConfigureAwait(false);
 
-        return result.StdOut
-            .Select(l => l.Trim())
-            // origin/HEAD is a symbolic pointer, not somewhere to release from.
-            .Where(l => l.Length > 0 && !l.EndsWith("/HEAD", StringComparison.Ordinal))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
+        var branches = new List<string>();
+        foreach (var line in result.StdOut)
+        {
+            var parts = line.Split('\t');
+            if (parts.Length < 2)
+                continue;
+
+            var full = parts[0].Trim();
+            var shortName = parts[1].Trim();
+
+            if (shortName.Length == 0 || full.EndsWith("/HEAD", StringComparison.Ordinal))
+                continue;
+
+            branches.Add(shortName);
+        }
+
+        return [.. branches.Distinct(StringComparer.Ordinal)];
     }
 
     public async Task<bool> IsWorkingTreeCleanAsync(string repoPath, CancellationToken ct = default)

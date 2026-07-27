@@ -106,9 +106,15 @@
 
                                     <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                         <TextBlock Text="發版來源" Opacity="0.7" VerticalAlignment="Center" />
+                                        <!-- MinimumPrefixLength=0 so focusing the box lists every
+                                             branch and tag; the default of 1 shows nothing until
+                                             you type, which reads as "no autocomplete". -->
                                         <AutoCompleteBox Text="{Binding Release.Source}"
-                                                         ItemsSource="{Binding Release.Branches}"
-                                                         FilterMode="Contains" MinWidth="260"
+                                                         ItemsSource="{Binding Release.SourceSuggestions}"
+                                                         FilterMode="Contains"
+                                                         MinimumPrefixLength="0"
+                                                         MaxDropDownHeight="260"
+                                                         MinWidth="260"
                                                          PlaceholderText="留空 = 目前 checkout;可填分支 / tag / commit" />
                                         <TextBlock Text="{Binding Release.Branch, StringFormat='(目前: {0})'}"
                                                    Opacity="0.5" FontSize="11" VerticalAlignment="Center" />
