@@ -29,11 +29,18 @@ dotnet test PublishManager.slnx
 ### 版號 = Git tag
 版號的真實來源是 **git tag**(SemVer)。app 讀取既有 tag、依所選遞增類型(major / minor / patch / prerelease)推算下一版。可設定 tag 前綴(預設 `v`)。
 
-### 兩種發版模型(每專案可選)
+### 兩種觸發方式(每專案可選)
 1. **TagPush** — 本機依序執行你設定的步驟(建置/打包等)→ 建立並推送 annotated tag → 由 tag 觸發 repo 的 GitHub Action。
 2. **WorkflowDispatch** — 透過 GitHub API 直接觸發雲端 workflow(帶 inputs)。
 
-發版流程:preflight(乾淨工作目錄 / 分支 / 遠端 tag 不存在)→ 算版號 → 本機步驟 → 觸發 → 定位並監看 run。支援 **dry-run**(只計算、不推送/不觸發),建議先跑一次 dry-run。
+發版流程:preflight(乾淨工作目錄 / 分支 / 遠端 tag 不存在)→ 算版號 → 本機步驟 → 觸發 → 定位並監看 run。
+
+一次發版只會監看**一個** workflow run;若偵測到 repo 裡還有其他吃 tag push 的 workflow,新增/編輯專案時會明確警告。
+
+### Dry-run
+Dry-run 會**實際執行所有本機步驟**,只保留不可逆的部分不做(不推 tag、不 dispatch、不建立 GitHub Release),所以它回答的是「**這次發版會不會成功**」。
+
+因此**步驟必須是可重複執行、沒有對外副作用的**(build / pack / test)。任何不可逆的動作(例如 `dotnet nuget push`)請放進 workflow,不要放在本機步驟。
 
 ### 傳給步驟的環境變數
 每個本機步驟執行時都會注入:
@@ -53,5 +60,18 @@ app 重用已登入的 `gh` CLI(`gh auth token`),token 只存記憶體、不落�
 ## GitHub Actions 監看
 觸發後 app 內即時輪詢 run / job / step 狀態並顯示時間軸。**log 於每個 job 完成時**取得(GitHub REST API 無法在 job 執行中即時串流 log)。本機步驟的輸出則是真正即時逐行串流。
 
+## Tag 管理與發版歷史
+兩者刻意分開,因為能做的事不同:
+
+- **Tag 管理** — 只列**活著的** git tag,可勾選刪除(本機 / 遠端 / GitHub Release 三個範圍各自獨立,需確認)
+- **發版歷史** — 唯讀,列出本 app 發過的版本。即使 tag 與 GitHub Release 都被刪光仍保留,用來回答「v0.20.0 是什麼時候、從哪個 commit 發的」
+
 ## 資料儲存
-專案設定存於 `%APPDATA%\PublishManager\projects.json`(原子寫入 + schemaVersion)。
+全部位於 `%APPDATA%\PublishManager\`:
+
+- `projects.json` — 專案設定(原子寫入 + schemaVersion)
+- `releases.ndjson` — 發版帳本(append-only,一行一筆;只存事實,不存 log)
+- `logs\` — 警告與錯誤的診斷紀錄(保留 14 天)
+
+## 領域語言
+`CONTEXT.md` 是這個專案的詞彙表(Release 與 GitHub Release、Stage 與 Step 等的精確定義),`docs/adr/` 記錄少數難以逆轉的決定。

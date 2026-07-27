@@ -11,8 +11,6 @@ public sealed record ProjectDetection
 {
     public bool IsGitRepository { get; init; }
 
-    public ProjectKind Kind { get; init; } = ProjectKind.Script;
-
     /// <summary>owner/repo parsed from the git remote, if any.</summary>
     public RepoSlug? Slug { get; init; }
 
@@ -26,6 +24,12 @@ public sealed record ProjectDetection
     /// <summary>Best workflow to use for triggering/monitoring, if one stands out.</summary>
     public string? SuggestedWorkflowFile { get; init; }
 
-    /// <summary>Release model implied by the suggested workflow's triggers.</summary>
-    public ReleaseModel? SuggestedReleaseModel { get; init; }
+    /// <summary>Release trigger implied by the suggested workflow's own triggers.</summary>
+    public ReleaseTrigger? SuggestedTrigger { get; init; }
+
+    /// <summary>
+    /// Tag-triggered workflows beyond the suggested one. A release watches a
+    /// single workflow run, so anything listed here would go unwatched.
+    /// </summary>
+    public IReadOnlyList<string> UnwatchedTagWorkflows { get; init; } = [];
 }

@@ -1,22 +1,16 @@
+using System.Text.Json.Serialization;
 using PublishManager.Core.Versioning;
 
 namespace PublishManager.Core.Models;
 
-/// <summary>How a project's release is triggered.</summary>
-public enum ReleaseModel
+/// <summary>How a project starts its workflow run.</summary>
+public enum ReleaseTrigger
 {
     /// <summary>Bump version locally, create &amp; push a git tag; the tag triggers the workflow.</summary>
     TagPush,
 
     /// <summary>Trigger a cloud workflow directly via the GitHub API (workflow_dispatch).</summary>
     WorkflowDispatch,
-}
-
-/// <summary>The dominant technology of a project (drives version-stamp / build helpers).</summary>
-public enum ProjectKind
-{
-    DotNet,
-    Script,
 }
 
 /// <summary>Which interpreter runs a release step's command.</summary>
@@ -32,7 +26,11 @@ public enum StepInterpreter
     Executable,
 }
 
-/// <summary>One ordered step of a project's local release pipeline.</summary>
+/// <summary>
+/// One command the user configures a project to run locally during a release.
+/// Expected to be repeatable and free of external side effects, so a dry run
+/// can execute it.
+/// </summary>
 public sealed class ReleaseStep
 {
     public string Name { get; set; } = string.Empty;
@@ -52,7 +50,11 @@ public sealed class ReleaseStep
     public bool ContinueOnError { get; set; }
 }
 
-/// <summary>A managed project and everything needed to release it.</summary>
+/// <summary>
+/// One release line the app manages: where its repository sits, and how that
+/// line is versioned and released. A repository may host several, told apart by
+/// tag prefix.
+/// </summary>
 public sealed class Project
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -62,9 +64,10 @@ public sealed class Project
     /// <summary>Absolute path to the local git working copy.</summary>
     public string LocalPath { get; set; } = string.Empty;
 
-    public ProjectKind Kind { get; set; } = ProjectKind.DotNet;
-
-    public ReleaseModel ReleaseModel { get; set; } = ReleaseModel.TagPush;
+    // Persisted under its old name so existing projects.json files keep their
+    // trigger instead of silently falling back to the default.
+    [JsonPropertyName("releaseModel")]
+    public ReleaseTrigger Trigger { get; set; } = ReleaseTrigger.TagPush;
 
     /// <summary>Tag prefix used for version tags (e.g. "v").</summary>
     public string TagPrefix { get; set; } = "v";
@@ -87,9 +90,6 @@ public sealed class Project
     /// <summary>Ordered local release steps (build/pack/etc.).</summary>
     public List<ReleaseStep> Steps { get; set; } = [];
 
-    /// <summary>Inputs sent with workflow_dispatch (WorkflowDispatch model).</summary>
+    /// <summary>Inputs sent with workflow_dispatch (WorkflowDispatch trigger).</summary>
     public Dictionary<string, string> DispatchInputs { get; set; } = [];
-
-    /// <summary>.NET only: pass the computed version to local build steps via -p:Version=.</summary>
-    public bool StampVersionIntoBuild { get; set; }
 }

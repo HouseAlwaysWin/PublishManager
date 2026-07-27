@@ -45,15 +45,13 @@ public sealed class JsonProjectStoreTests : IDisposable
         {
             Name = "My App",
             LocalPath = @"D:\DotNetProjects\MyApp",
-            Kind = ProjectKind.DotNet,
-            ReleaseModel = ReleaseModel.WorkflowDispatch,
+            Trigger = ReleaseTrigger.WorkflowDispatch,
             TagPrefix = "v",
             DefaultBump = VersionBump.Minor,
             ReleaseBranch = "main",
             Owner = "HouseAlwaysWin",
             Repo = "MyApp",
             WorkflowFile = "release.yml",
-            StampVersionIntoBuild = true,
             Steps =
             {
                 new ReleaseStep { Name = "build", Interpreter = StepInterpreter.PowerShell, Command = "dotnet build" },
@@ -68,10 +66,9 @@ public sealed class JsonProjectStoreTests : IDisposable
         var only = Assert.Single(loaded);
         Assert.Equal(project.Id, only.Id);
         Assert.Equal("My App", only.Name);
-        Assert.Equal(ReleaseModel.WorkflowDispatch, only.ReleaseModel);
+        Assert.Equal(ReleaseTrigger.WorkflowDispatch, only.Trigger);
         Assert.Equal(VersionBump.Minor, only.DefaultBump);
         Assert.Equal("release.yml", only.WorkflowFile);
-        Assert.True(only.StampVersionIntoBuild);
         Assert.Equal(2, only.Steps.Count);
         Assert.Equal(StepInterpreter.Executable, only.Steps[1].Interpreter);
         Assert.Equal("pack", only.Steps[1].Arguments[0]);
@@ -90,9 +87,45 @@ public sealed class JsonProjectStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Load_FileWrittenBeforeTheRename_KeepsItsTrigger()
+    {
+        // Verbatim shape of a projects.json written before ReleaseModel was
+        // renamed to Trigger and Kind/StampVersionIntoBuild were removed. The
+        // trigger must survive; a silent fall back to TagPush would quietly
+        // change how the project releases.
+        Directory.CreateDirectory(_dir);
+        await File.WriteAllTextAsync(_options.ProjectsPath, """
+        {
+          "schemaVersion": 1,
+          "projects": [
+            {
+              "id": "4ea2742b-e6bb-423d-bddc-c015300eeb80",
+              "name": "GimmeCapture",
+              "localPath": "D:\\DotNetProjects\\GimmeCapture",
+              "kind": "DotNet",
+              "releaseModel": "WorkflowDispatch",
+              "tagPrefix": "v",
+              "defaultBump": "Patch",
+              "steps": [],
+              "dispatchInputs": {},
+              "stampVersionIntoBuild": true
+            }
+          ]
+        }
+        """);
+
+        var loaded = await _sut.LoadAsync();
+
+        var only = Assert.Single(loaded);
+        Assert.Equal(ReleaseTrigger.WorkflowDispatch, only.Trigger);
+        Assert.Equal("GimmeCapture", only.Name);
+        Assert.Equal(Guid.Parse("4ea2742b-e6bb-423d-bddc-c015300eeb80"), only.Id);
+    }
+
+    [Fact]
     public async Task SavedFile_UsesStringEnumsAndSchemaVersion()
     {
-        await _sut.SaveAsync([new Project { Name = "X", ReleaseModel = ReleaseModel.TagPush }]);
+        await _sut.SaveAsync([new Project { Name = "X", Trigger = ReleaseTrigger.TagPush }]);
 
         var json = await File.ReadAllTextAsync(_options.ProjectsPath);
         Assert.Contains("\"schemaVersion\": 1", json);

@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PublishManager.ViewModels"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="680" d:DesignHeight="520"
+        x:Class="PublishManager.Views.ReleaseLedgerWindow"
+        x:DataType="vm:ReleaseLedgerViewModel"
+        Width="680" Height="540"
+        WindowStartupLocation="CenterOwner"
+        Title="{Binding Title}">
+
+    <DockPanel Margin="16">
+
+        <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" FontSize="18" FontWeight="Bold" Margin="0,0,0,4" />
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,12" FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                   Text="這份紀錄存在本機,即使 tag 與 GitHub Release 被刪除也會保留。日誌不在此處,請用「在 GitHub 開啟」查看。" />
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0" Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.85"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding Status, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+            <Button Grid.Column="1" Content="重新整理" Command="{Binding RefreshCommand}" Margin="0,0,8,0" />
+            <Button Grid.Column="2" Content="關閉" Click="OnCloseClick" MinWidth="70" />
+        </Grid>
+
+        <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="6">
+            <Panel>
+                <ProgressBar IsIndeterminate="True" Height="4" VerticalAlignment="Top"
+                             IsVisible="{Binding IsBusy}" />
+
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Releases}" Margin="4">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LedgerEntryRowViewModel">
+                                <Border Padding="8,6" Margin="2" CornerRadius="4" Background="#0C808080">
+                                    <StackPanel Spacing="3">
+                                        <Grid ColumnDefinitions="Auto,150,120,90,*">
+                                            <TextBlock Grid.Column="0" Text="{Binding Glyph}" Foreground="{Binding GlyphBrush}"
+                                                       FontWeight="Bold" Width="20" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Tag}" FontWeight="SemiBold"
+                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Text="{Binding ReleasedAtText}" Opacity="0.6"
+                                                       FontSize="12" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="3" Text="{Binding ShortSha}" Opacity="0.6"
+                                                       FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12"
+                                                       VerticalAlignment="Center" />
+                                            <Button Grid.Column="4" Content="在 GitHub 開啟" Click="OnOpenRunClick"
+                                                    HorizontalAlignment="Left" Padding="8,2" FontSize="11"
+                                                    IsVisible="{Binding HasRunUrl}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding Error}" Foreground="#F85149" FontSize="11"
+                                                   TextWrapping="Wrap" Margin="20,0,0,0"
+                                                   IsVisible="{Binding Error, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Panel>
+        </Border>
+    </DockPanel>
+</Window>

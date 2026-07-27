@@ -61,7 +61,7 @@ public sealed class GitHubActionsService(IGitHubAuthProvider auth, ILogger<GitHu
         await client.Actions.Workflows.CreateDispatch(owner, repo, workflowFile, dispatch).ConfigureAwait(false);
     }
 
-    public async Task<long?> FindRunAsync(RunQuery query, CancellationToken ct = default)
+    public async Task<RunMatch?> FindRunAsync(RunQuery query, CancellationToken ct = default)
     {
         var client = await GetClientAsync(ct).ConfigureAwait(false);
 
@@ -88,13 +88,13 @@ public sealed class GitHubActionsService(IGitHubAuthProvider auth, ILogger<GitHu
                     : await client.Actions.Workflows.Runs
                         .ListByWorkflow(query.Owner, query.Repo, query.WorkflowFile, request, options).ConfigureAwait(false);
 
-                var match = response.WorkflowRuns
+                var candidates = response.WorkflowRuns
                     .Where(r => r.CreatedAt >= cutoff)
                     .OrderByDescending(r => r.CreatedAt)
-                    .FirstOrDefault();
+                    .ToList();
 
-                if (match is not null)
-                    return match.Id;
+                if (candidates.Count > 0)
+                    return new RunMatch(candidates[0].Id, candidates.Count);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -144,7 +144,7 @@ public sealed class GitHubActionsService(IGitHubAuthProvider auth, ILogger<GitHu
         }
     }
 
-    public async Task<IReadOnlySet<string>> GetReleaseTagsAsync(string owner, string repo, CancellationToken ct = default)
+    public async Task<IReadOnlySet<string>> GetGitHubReleaseTagsAsync(string owner, string repo, CancellationToken ct = default)
     {
         var client = await GetClientAsync(ct).ConfigureAwait(false);
         try
@@ -159,7 +159,7 @@ public sealed class GitHubActionsService(IGitHubAuthProvider auth, ILogger<GitHu
         }
     }
 
-    public async Task<bool> DeleteReleaseForTagAsync(string owner, string repo, string tag, CancellationToken ct = default)
+    public async Task<bool> DeleteGitHubReleaseForTagAsync(string owner, string repo, string tag, CancellationToken ct = default)
     {
         var client = await GetClientAsync(ct).ConfigureAwait(false);
 

@@ -24,11 +24,12 @@ public interface IGitHubActionsService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Polls for the run triggered by a release and returns its id, or null if none
-    /// appears before <see cref="RunQuery.Timeout"/>. Correlates by workflow + event
-    /// + (head_sha for tag-push / actor+branch for dispatch) + created-since.
+    /// Polls for the run triggered by a release, or null if none appears before
+    /// <see cref="RunQuery.Timeout"/>. Correlates by workflow + event +
+    /// (head_sha for tag-push / actor+branch for dispatch) + created-since, and
+    /// reports how many runs matched so a silent choice can be surfaced.
     /// </summary>
-    Task<long?> FindRunAsync(RunQuery query, CancellationToken ct = default);
+    Task<RunMatch?> FindRunAsync(RunQuery query, CancellationToken ct = default);
 
     /// <summary>Fetches a run plus its jobs and steps (for the live monitor).</summary>
     Task<WorkflowRunSnapshot?> GetRunSnapshotAsync(string owner, string repo, long runId, CancellationToken ct = default);
@@ -37,11 +38,11 @@ public interface IGitHubActionsService
     Task<string> GetJobLogsAsync(string owner, string repo, long jobId, CancellationToken ct = default);
 
     /// <summary>Tag names that have a published GitHub Release, so the UI can flag them.</summary>
-    Task<IReadOnlySet<string>> GetReleaseTagsAsync(string owner, string repo, CancellationToken ct = default);
+    Task<IReadOnlySet<string>> GetGitHubReleaseTagsAsync(string owner, string repo, CancellationToken ct = default);
 
     /// <summary>
     /// Deletes the GitHub Release published for <paramref name="tag"/>, if there
-    /// is one. Returns true when a release was actually deleted.
+    /// is one. Returns true when one was actually deleted.
     /// </summary>
-    Task<bool> DeleteReleaseForTagAsync(string owner, string repo, string tag, CancellationToken ct = default);
+    Task<bool> DeleteGitHubReleaseForTagAsync(string owner, string repo, string tag, CancellationToken ct = default);
 }

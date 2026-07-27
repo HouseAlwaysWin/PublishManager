@@ -64,6 +64,13 @@ public sealed record GitHubAuthStatus(
     public bool HasWorkflowScope => Scopes.Contains("workflow");
 }
 
+/// <summary>
+/// The workflow run a release was matched to, and how many candidates it was
+/// chosen from. More than one means the trigger started runs this release will
+/// not be watching.
+/// </summary>
+public sealed record RunMatch(long RunId, int CandidateCount);
+
 /// <summary>Parameters for locating the run triggered by a release (tag-push or dispatch).</summary>
 public sealed record RunQuery
 {

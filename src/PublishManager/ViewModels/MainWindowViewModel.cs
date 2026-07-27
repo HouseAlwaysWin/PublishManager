@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PublishManager.Core.Models;
 using PublishManager.Core.Storage;
 using PublishManager.Services;
+using PublishManager.Core;
 
 namespace PublishManager.ViewModels;
 
@@ -39,10 +40,14 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty] private ReleaseViewModel? _release;
 
+    /// <summary>A failure the user must know about, such as configuration not saving.</summary>
+    [ObservableProperty] private string? _problem;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EditProjectCommand))]
     [NotifyCanExecuteChangedFor(nameof(RemoveProjectCommand))]
     [NotifyCanExecuteChangedFor(nameof(ManageTagsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ShowLedgerCommand))]
     private Project? _selectedProject;
 
     public bool HasSelection => SelectedProject is not null;
@@ -83,13 +88,14 @@ public partial class MainWindowViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load projects on startup.");
+            Problem = $"讀取專案設定失敗:{ex.Message}(詳見 {StorageOptions.Default.LogDirectory})";
         }
     }
 
     [RelayCommand]
     private async Task AddProjectAsync()
     {
-        var created = await _dialogs.ShowProjectEditorAsync(null);
+        var created = await _dialogs.ShowProjectEditorAsync(null, [.. Projects]);
         if (created is null)
             return;
 
@@ -104,7 +110,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (SelectedProject is null)
             return;
 
-        var edited = await _dialogs.ShowProjectEditorAsync(SelectedProject);
+        var edited = await _dialogs.ShowProjectEditorAsync(SelectedProject, [.. Projects]);
         if (edited is null)
             return;
 
@@ -115,7 +121,7 @@ public partial class MainWindowViewModel : ViewModelBase
         await SaveAsync();
     }
 
-    /// <summary>Opens the tag/version manager for the selected project.</summary>
+    /// <summary>Opens the tag manager for the selected project's live tags.</summary>
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task ManageTagsAsync()
     {
@@ -127,6 +133,16 @@ public partial class MainWindowViewModel : ViewModelBase
         // Tags may have been deleted — refresh the release panel's version info.
         if (Release is not null)
             Release.UpdateProject(SelectedProject);
+    }
+
+    /// <summary>Opens the release ledger for the selected project.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task ShowLedgerAsync()
+    {
+        if (SelectedProject is null)
+            return;
+
+        await _dialogs.ShowReleaseLedgerAsync(SelectedProject);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
@@ -143,15 +159,21 @@ public partial class MainWindowViewModel : ViewModelBase
         await SaveAsync();
     }
 
+    /// <summary>
+    /// Persists the project list. A failure here silently loses the user's
+    /// configuration, so it is surfaced rather than swallowed.
+    /// </summary>
     private async Task SaveAsync()
     {
         try
         {
             await _store.SaveAsync([.. Projects]);
+            Problem = null;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save projects.");
+            Problem = $"專案設定儲存失敗,你的變更沒有被寫入磁碟:{ex.Message}(詳見 {StorageOptions.Default.LogDirectory})";
         }
     }
 }

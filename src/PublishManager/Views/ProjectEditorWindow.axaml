@@ -45,29 +45,25 @@
                     </Grid>
                     <TextBlock Text="{Binding DetectSummary}" FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                IsVisible="{Binding DetectSummary, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{Binding DetectWarning}" FontSize="11" Foreground="#D29922" TextWrapping="Wrap"
+                               IsVisible="{Binding DetectWarning, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="專案類型" FontWeight="SemiBold" />
-                        <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="4">
-                        <TextBlock Text="發版模型" FontWeight="SemiBold" />
-                        <ComboBox ItemsSource="{Binding ReleaseModels}" SelectedItem="{Binding ReleaseModel}" HorizontalAlignment="Stretch" />
-                    </StackPanel>
-                </Grid>
-
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Tag 前綴" FontWeight="SemiBold" />
-                        <TextBox Text="{Binding TagPrefix}" PlaceholderText="v" />
+                        <TextBlock Text="觸發方式" FontWeight="SemiBold" />
+                        <ComboBox ItemsSource="{Binding Triggers}" SelectedItem="{Binding Trigger}" HorizontalAlignment="Stretch" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="4">
                         <TextBlock Text="預設版號遞增" FontWeight="SemiBold" />
                         <ComboBox ItemsSource="{Binding Bumps}" SelectedItem="{Binding DefaultBump}" HorizontalAlignment="Stretch" />
                     </StackPanel>
                 </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Tag 前綴" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding TagPrefix}" PlaceholderText="v" />
+                </StackPanel>
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="發版分支" FontWeight="SemiBold" />
@@ -90,8 +86,6 @@
                     <TextBox Text="{Binding WorkflowFile}" PlaceholderText="release.yml" />
                 </StackPanel>
 
-                <CheckBox Content=".NET：本機 build 時帶入版號（-p:Version=）"
-                          IsChecked="{Binding StampVersionIntoBuild}" />
 
                 <!-- Steps editor -->
                 <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,4,0,0">

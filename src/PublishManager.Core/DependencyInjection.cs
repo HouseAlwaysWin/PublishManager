@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PublishManager.Core.Detection;
 using PublishManager.Core.Git;
 using PublishManager.Core.GitHub;
+using PublishManager.Core.Ledger;
 using PublishManager.Core.Processes;
 using PublishManager.Core.Release;
 using PublishManager.Core.Storage;
@@ -25,6 +26,7 @@ public static class CoreServiceCollectionExtensions
 
         services.AddSingleton(StorageOptions.Default);
         services.AddSingleton<IProjectStore, JsonProjectStore>();
+        services.AddSingleton<IReleaseLedger, JsonReleaseLedger>();
 
         services.AddSingleton<IGitHubAuthProvider, GitHubAuthProvider>();
         services.AddSingleton<IGitHubActionsService, GitHubActionsService>();

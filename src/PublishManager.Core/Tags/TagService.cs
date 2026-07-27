@@ -28,7 +28,7 @@ public sealed class TagService(
 
         var local = await _git.ListTagDetailsAsync(project.LocalPath, ct).ConfigureAwait(false);
         var remote = await ListRemoteTagNamesAsync(project.LocalPath, ct).ConfigureAwait(false);
-        var releaseTags = await GetReleaseTagsAsync(project, ct).ConfigureAwait(false);
+        var releaseTags = await GetGitHubReleaseTagsAsync(project, ct).ConfigureAwait(false);
 
         var byName = local.ToDictionary(t => t.Name, StringComparer.Ordinal);
         var allNames = new HashSet<string>(byName.Keys, StringComparer.Ordinal);
@@ -77,7 +77,7 @@ public sealed class TagService(
                 var slug = await ResolveSlugAsync(project, ct).ConfigureAwait(false);
                 if (slug is not null)
                     deletedRelease = await _github
-                        .DeleteReleaseForTagAsync(slug.Value.Owner, slug.Value.Repo, tag, ct)
+                        .DeleteGitHubReleaseForTagAsync(slug.Value.Owner, slug.Value.Repo, tag, ct)
                         .ConfigureAwait(false);
             }
 
@@ -113,14 +113,14 @@ public sealed class TagService(
         return await _git.GetRemoteSlugAsync(project.LocalPath, ct: ct).ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlySet<string>> GetReleaseTagsAsync(Project project, CancellationToken ct)
+    private async Task<IReadOnlySet<string>> GetGitHubReleaseTagsAsync(Project project, CancellationToken ct)
     {
         try
         {
             var slug = await ResolveSlugAsync(project, ct).ConfigureAwait(false);
             if (slug is null)
                 return new HashSet<string>(StringComparer.Ordinal);
-            return await _github.GetReleaseTagsAsync(slug.Value.Owner, slug.Value.Repo, ct).ConfigureAwait(false);
+            return await _github.GetGitHubReleaseTagsAsync(slug.Value.Owner, slug.Value.Repo, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

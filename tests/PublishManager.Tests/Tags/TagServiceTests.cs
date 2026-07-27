@@ -169,12 +169,12 @@ sealed class TagFakeGitHubService : IGitHubActionsService
     public Task<GitHubAuthStatus> GetAuthStatusAsync(CancellationToken ct = default) => Task.FromResult(new GitHubAuthStatus(true, "tester", ["repo"], "gh"));
     public Task<IReadOnlyList<WorkflowInfo>> ListWorkflowsAsync(string o, string r, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<WorkflowInfo>>([]);
     public Task DispatchAsync(string o, string r, string wf, string gitRef, IReadOnlyDictionary<string, string> inputs, CancellationToken ct = default) => Task.CompletedTask;
-    public Task<long?> FindRunAsync(RunQuery query, CancellationToken ct = default) => Task.FromResult<long?>(null);
+    public Task<RunMatch?> FindRunAsync(RunQuery query, CancellationToken ct = default) => Task.FromResult<RunMatch?>(null);
     public Task<WorkflowRunSnapshot?> GetRunSnapshotAsync(string o, string r, long id, CancellationToken ct = default) => Task.FromResult<WorkflowRunSnapshot?>(null);
     public Task<string> GetJobLogsAsync(string o, string r, long id, CancellationToken ct = default) => Task.FromResult(string.Empty);
-    public Task<IReadOnlySet<string>> GetReleaseTagsAsync(string o, string r, CancellationToken ct = default) => Task.FromResult<IReadOnlySet<string>>(ReleaseTags);
+    public Task<IReadOnlySet<string>> GetGitHubReleaseTagsAsync(string o, string r, CancellationToken ct = default) => Task.FromResult<IReadOnlySet<string>>(ReleaseTags);
 
-    public Task<bool> DeleteReleaseForTagAsync(string o, string r, string tag, CancellationToken ct = default)
+    public Task<bool> DeleteGitHubReleaseForTagAsync(string o, string r, string tag, CancellationToken ct = default)
     {
         OperationOrder.Add("release");
         if (!ReleaseExistsForTag)

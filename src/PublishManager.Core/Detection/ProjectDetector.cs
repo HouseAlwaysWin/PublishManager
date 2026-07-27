@@ -8,9 +8,6 @@ namespace PublishManager.Core.Detection;
 /// <summary>Default <see cref="IProjectDetector"/>: filesystem probing + git queries.</summary>
 public sealed partial class ProjectDetector(IGitService git, ILogger<ProjectDetector> logger) : IProjectDetector
 {
-    private static readonly string[] DotNetPatterns = ["*.sln", "*.slnx", "*.csproj", "*.fsproj"];
-    private static readonly string[] SkipDirectories = ["bin", "obj", ".git", "node_modules", ".vs", ".idea"];
-
     private readonly IGitService _git = git;
     private readonly ILogger<ProjectDetector> _logger = logger;
 
@@ -20,7 +17,6 @@ public sealed partial class ProjectDetector(IGitService git, ILogger<ProjectDete
             return new ProjectDetection();
 
         var root = localPath.Trim();
-        var kind = ContainsFile(root, DotNetPatterns) ? ProjectKind.DotNet : ProjectKind.Script;
         var workflows = ReadWorkflows(root);
         var suggested = PickWorkflow(workflows);
 
@@ -47,17 +43,22 @@ public sealed partial class ProjectDetector(IGitService git, ILogger<ProjectDete
         return new ProjectDetection
         {
             IsGitRepository = isRepo,
-            Kind = kind,
             Slug = slug,
             CurrentBranch = branch,
             TagPrefix = tagPrefix,
             Workflows = workflows,
             SuggestedWorkflowFile = suggested?.FileName,
-            SuggestedReleaseModel = suggested is null
+            SuggestedTrigger = suggested is null
                 ? null
-                : suggested.TriggersOnTagPush ? ReleaseModel.TagPush
-                : suggested.TriggersOnDispatch ? ReleaseModel.WorkflowDispatch
+                : suggested.TriggersOnTagPush ? ReleaseTrigger.TagPush
+                : suggested.TriggersOnDispatch ? ReleaseTrigger.WorkflowDispatch
                 : null,
+            UnwatchedTagWorkflows =
+            [
+                .. workflows
+                    .Where(w => w.TriggersOnTagPush && w.FileName != suggested?.FileName)
+                    .Select(w => w.FileName)
+            ],
         };
     }
 
@@ -113,43 +114,6 @@ public sealed partial class ProjectDetector(IGitService git, ILogger<ProjectDete
         return counts.Count == 0
             ? null
             : counts.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).First().Key;
-    }
-
-    /// <summary>Breadth-first bounded search for any matching file (skips build/vendor dirs).</summary>
-    private static bool ContainsFile(string root, string[] patterns, int maxDepth = 3)
-    {
-        var queue = new Queue<(string Path, int Depth)>();
-        queue.Enqueue((root, 0));
-
-        while (queue.Count > 0)
-        {
-            var (dir, depth) = queue.Dequeue();
-            try
-            {
-                foreach (var pattern in patterns)
-                {
-                    if (Directory.EnumerateFiles(dir, pattern).Any())
-                        return true;
-                }
-
-                if (depth >= maxDepth)
-                    continue;
-
-                foreach (var sub in Directory.EnumerateDirectories(dir))
-                {
-                    var name = Path.GetFileName(sub);
-                    if (SkipDirectories.Contains(name, StringComparer.OrdinalIgnoreCase))
-                        continue;
-                    queue.Enqueue((sub, depth + 1));
-                }
-            }
-            catch
-            {
-                // unreadable directory — ignore
-            }
-        }
-
-        return false;
     }
 
     [GeneratedRegex(@"^\s*tags:", RegexOptions.Multiline)]

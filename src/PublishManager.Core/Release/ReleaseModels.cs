@@ -4,7 +4,7 @@ using PublishManager.Core.Versioning;
 namespace PublishManager.Core.Release;
 
 /// <summary>Status of a single stage in the release pipeline.</summary>
-public enum ReleaseStageStatus
+public enum ReleaseProgressStatus
 {
     Pending,
     Running,
@@ -13,8 +13,30 @@ public enum ReleaseStageStatus
     Skipped,
 }
 
-/// <summary>A pipeline stage transition, streamed to the UI as the release progresses.</summary>
-public sealed record ReleaseEvent(string Stage, ReleaseStageStatus Status, string? Message = null);
+/// <summary>Stable keys for the fixed stages every release passes through.</summary>
+public static class ReleaseProgressKeys
+{
+    public const string Preflight = "stage:preflight";
+    public const string Version = "stage:version";
+    public const string Tag = "stage:tag";
+    public const string Dispatch = "stage:dispatch";
+    public const string LocateRun = "stage:locate-run";
+    public const string Cancelled = "stage:cancelled";
+
+    /// <summary>Key for the user's Nth configured step (zero-based).</summary>
+    public static string ForStep(int index) => $"step:{index}";
+}
+
+/// <summary>
+/// A progress report from a release, for one stage or one step.
+/// <paramref name="Key"/> identifies the row and is stable; <paramref name="Label"/>
+/// is only for display, so a step may safely be named after a built-in stage.
+/// </summary>
+public sealed record ReleaseEvent(
+    string Key,
+    string Label,
+    ReleaseProgressStatus Status,
+    string? Message = null);
 
 /// <summary>Inputs for one release run.</summary>
 public sealed record ReleaseRequest

@@ -11,33 +11,36 @@ using PublishManager.Core.Versioning;
 
 namespace PublishManager.ViewModels;
 
-/// <summary>One stage row in the release pipeline progress list.</summary>
-public partial class ReleaseStageViewModel(string name) : ViewModelBase
+/// <summary>One row in the release progress list — a stage or a step.</summary>
+public partial class ReleaseProgressRowViewModel(string key, string label) : ViewModelBase
 {
-    public string Name { get; } = name;
+    /// <summary>Stable identity of the row; never the display label.</summary>
+    public string Key { get; } = key;
+
+    public string Label { get; } = label;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Glyph))]
     [NotifyPropertyChangedFor(nameof(GlyphBrush))]
-    private ReleaseStageStatus _status;
+    private ReleaseProgressStatus _status;
 
     [ObservableProperty] private string? _message;
 
     public string Glyph => Status switch
     {
-        ReleaseStageStatus.Succeeded => "✓",
-        ReleaseStageStatus.Failed => "✗",
-        ReleaseStageStatus.Running => "●",
-        ReleaseStageStatus.Skipped => "–",
+        ReleaseProgressStatus.Succeeded => "✓",
+        ReleaseProgressStatus.Failed => "✗",
+        ReleaseProgressStatus.Running => "●",
+        ReleaseProgressStatus.Skipped => "–",
         _ => "○",
     };
 
     public IBrush GlyphBrush => Status switch
     {
-        ReleaseStageStatus.Succeeded => RunGlyph.Success,
-        ReleaseStageStatus.Failed => RunGlyph.Failure,
-        ReleaseStageStatus.Running => RunGlyph.Running,
-        ReleaseStageStatus.Skipped => RunGlyph.Muted,
+        ReleaseProgressStatus.Succeeded => RunGlyph.Success,
+        ReleaseProgressStatus.Failed => RunGlyph.Failure,
+        ReleaseProgressStatus.Running => RunGlyph.Running,
+        ReleaseProgressStatus.Skipped => RunGlyph.Muted,
         _ => RunGlyph.Pending,
     };
 }
@@ -74,7 +77,7 @@ public partial class ReleaseViewModel : ViewModelBase
 
     public WorkflowRunMonitorViewModel Monitor { get; }
 
-    public ObservableCollection<ReleaseStageViewModel> Stages { get; } = [];
+    public ObservableCollection<ReleaseProgressRowViewModel> Stages { get; } = [];
     public VersionBump[] Bumps { get; } = Enum.GetValues<VersionBump>();
 
     [ObservableProperty] private Project? _project;
@@ -251,7 +254,7 @@ public partial class ReleaseViewModel : ViewModelBase
 
             StatusMessage = result.Success
                 ? result.DryRun
-                    ? $"Dry-run 完成:下一版將是 {result.Tag}"
+                    ? $"Dry-run 通過:發版會成功,下一版為 {result.Tag}(未推送 / 未觸發)"
                     : $"發版成功:{result.Tag}"
                 : $"發版失敗:{result.Error}";
 
@@ -289,10 +292,10 @@ public partial class ReleaseViewModel : ViewModelBase
 
     private void OnReleaseEvent(ReleaseEvent e)
     {
-        var stage = Stages.FirstOrDefault(s => s.Name == e.Stage);
+        var stage = Stages.FirstOrDefault(s => s.Key == e.Key);
         if (stage is null)
         {
-            stage = new ReleaseStageViewModel(e.Stage);
+            stage = new ReleaseProgressRowViewModel(e.Key, e.Label);
             Stages.Add(stage);
         }
         stage.Status = e.Status;

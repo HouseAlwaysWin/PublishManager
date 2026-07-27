@@ -31,9 +31,8 @@ public sealed class ProjectDetectorTests : IDisposable
     }
 
     [Fact]
-    public async Task Detects_DotNet_TagWorkflow_Slug_Branch_AndTagPrefix()
+    public async Task Detects_TagWorkflow_Slug_Branch_AndTagPrefix()
     {
-        File.WriteAllText(Path.Combine(_dir, "App.csproj"), "<Project />");
         WriteWorkflow("ci.yml", "on:\n  workflow_dispatch:\n");
         WriteWorkflow("release.yml", "on:\n  push:\n    tags:\n      - 'v*'\n");
 
@@ -48,38 +47,40 @@ public sealed class ProjectDetectorTests : IDisposable
         var detection = await CreateSut(git).DetectAsync(_dir);
 
         Assert.True(detection.IsGitRepository);
-        Assert.Equal(ProjectKind.DotNet, detection.Kind);
         Assert.Equal("HouseAlwaysWin", detection.Slug!.Value.Owner);
         Assert.Equal("PublishManager", detection.Slug!.Value.Repo);
         Assert.Equal("main", detection.CurrentBranch);
         Assert.Equal("v", detection.TagPrefix);
         Assert.Equal("release.yml", detection.SuggestedWorkflowFile);   // tag trigger wins over dispatch
-        Assert.Equal(ReleaseModel.TagPush, detection.SuggestedReleaseModel);
+        Assert.Equal(ReleaseTrigger.TagPush, detection.SuggestedTrigger);
+        Assert.Empty(detection.UnwatchedTagWorkflows);
     }
 
     [Fact]
-    public async Task Detects_Script_AndDispatchModel_WhenOnlyDispatchWorkflow()
+    public async Task Detects_DispatchTrigger_WhenOnlyDispatchWorkflow()
     {
         WriteWorkflow("deploy.yml", "on:\n  workflow_dispatch:\n    inputs:\n      version:\n");
 
         var detection = await CreateSut(new StubGitService { IsRepo = false }).DetectAsync(_dir);
 
-        Assert.Equal(ProjectKind.Script, detection.Kind);
         Assert.Equal("deploy.yml", detection.SuggestedWorkflowFile);
-        Assert.Equal(ReleaseModel.WorkflowDispatch, detection.SuggestedReleaseModel);
+        Assert.Equal(ReleaseTrigger.WorkflowDispatch, detection.SuggestedTrigger);
         Assert.False(detection.IsGitRepository);
     }
 
     [Fact]
-    public async Task FindsDotNetProject_InNestedSrcFolder()
+    public async Task ReportsTheTagWorkflowsThatWouldGoUnwatched()
     {
-        var nested = Path.Combine(_dir, "src", "App");
-        Directory.CreateDirectory(nested);
-        File.WriteAllText(Path.Combine(nested, "App.csproj"), "<Project />");
+        // A release watches one run, so a second tag-triggered workflow would
+        // run unseen. It must be named rather than silently dropped.
+        WriteWorkflow("release.yml", "on:\n  push:\n    tags:\n      - 'v*'\n");
+        WriteWorkflow("docs.yml", "on:\n  push:\n    tags:\n      - 'v*'\n");
 
         var detection = await CreateSut(new StubGitService()).DetectAsync(_dir);
 
-        Assert.Equal(ProjectKind.DotNet, detection.Kind);
+        var unwatched = Assert.Single(detection.UnwatchedTagWorkflows);
+        Assert.NotEqual(detection.SuggestedWorkflowFile, unwatched);
+        Assert.Contains(unwatched, new[] { "release.yml", "docs.yml" });
     }
 
     [Fact]

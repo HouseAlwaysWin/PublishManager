@@ -9,8 +9,15 @@ public interface IDialogService
     /// Opens the project editor. Returns the built project on save, or null if cancelled.
     /// Pass <paramref name="existing"/> to edit (the result keeps the same Id), or null to add.
     /// </summary>
-    Task<Project?> ShowProjectEditorAsync(Project? existing);
+    /// <param name="allProjects">
+    /// Every managed project, so the editor can refuse a path/tag-prefix pair
+    /// another project already owns.
+    /// </param>
+    Task<Project?> ShowProjectEditorAsync(Project? existing, IReadOnlyList<Project> allProjects);
 
-    /// <summary>Opens the tag/version manager for <paramref name="project"/>.</summary>
+    /// <summary>Opens the tag manager for <paramref name="project"/>'s live tags.</summary>
     Task ShowTagManagerAsync(Project project);
+
+    /// <summary>Opens the release ledger recorded for <paramref name="project"/>.</summary>
+    Task ShowReleaseLedgerAsync(Project project);
 }

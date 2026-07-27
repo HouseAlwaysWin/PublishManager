@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using PublishManager.Core.Git;
 using PublishManager.Core.GitHub;
+using PublishManager.Core.Ledger;
 using PublishManager.Core.Models;
 using PublishManager.Core.Processes;
 using PublishManager.Core.Release;
@@ -13,15 +14,16 @@ public class ReleaseOrchestratorTests
     private readonly FakeGitService _git = new();
     private readonly FakeProcessRunner _runner = new();
     private readonly FakeGitHubActionsService _github = new();
+    private readonly FakeReleaseLedger _ledger = new();
 
     private ReleaseOrchestrator CreateSut() =>
-        new(_git, new SemVerService(), _runner, _github, NullLogger<ReleaseOrchestrator>.Instance);
+        new(_git, new SemVerService(), _runner, _github, _ledger, NullLogger<ReleaseOrchestrator>.Instance);
 
     private static Project TagPushProject(params ReleaseStep[] steps) => new()
     {
         Name = "App",
         LocalPath = @"C:\repo",
-        ReleaseModel = ReleaseModel.TagPush,
+        Trigger = ReleaseTrigger.TagPush,
         TagPrefix = "v",
         DefaultBump = VersionBump.Patch,
         ReleaseBranch = "main",
@@ -33,8 +35,10 @@ public class ReleaseOrchestratorTests
         new() { Name = name, Interpreter = StepInterpreter.PowerShell, Command = "echo hi" };
 
     [Fact]
-    public async Task DryRun_ComputesVersion_ButSkipsSideEffects()
+    public async Task DryRun_RunsTheStepsButWithholdsTheIrreversibleParts()
     {
+        // A dry run answers "would this release succeed?", so the local steps
+        // must actually run — only the outward effects are withheld.
         _git.Tags = ["v1.0.0"];
         var request = new ReleaseRequest { Project = TagPushProject(PsStep()), Bump = VersionBump.Patch, DryRun = true };
 
@@ -44,10 +48,37 @@ public class ReleaseOrchestratorTests
         Assert.True(result.DryRun);
         Assert.Equal("v1.0.1", result.Tag);
         Assert.Equal("1.0.1", result.Version);
-        Assert.Empty(_runner.Requests);        // step skipped
+        Assert.Single(_runner.Requests);        // the step ran
         Assert.Empty(_git.CreatedTags);         // no tag created
         Assert.Empty(_git.PushedTags);          // no tag pushed
         Assert.Null(result.RunId);              // no run located
+    }
+
+    [Fact]
+    public async Task DryRun_FailingStep_FailsTheRelease()
+    {
+        _git.Tags = ["v1.0.0"];
+        _runner.ExitCode = 1;
+        var request = new ReleaseRequest { Project = TagPushProject(PsStep()), Bump = VersionBump.Patch, DryRun = true };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Empty(_git.PushedTags);
+    }
+
+    [Fact]
+    public async Task DryRun_DoesNotDispatch()
+    {
+        _git.Tags = ["v1.0.0"];
+        var project = TagPushProject();
+        project.Trigger = ReleaseTrigger.WorkflowDispatch;
+        var request = new ReleaseRequest { Project = project, Bump = VersionBump.Patch, DryRun = true };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, _github.DispatchCount);
     }
 
     [Fact]
@@ -158,7 +189,7 @@ public class ReleaseOrchestratorTests
     {
         _git.Tags = ["v3.0.0"];
         var project = TagPushProject();
-        project.ReleaseModel = ReleaseModel.WorkflowDispatch;
+        project.Trigger = ReleaseTrigger.WorkflowDispatch;
         project.DispatchInputs["version"] = "$VERSION";
         project.DispatchInputs["ref_tag"] = "$TAG";
         var request = new ReleaseRequest { Project = project, Bump = VersionBump.Patch };
@@ -171,6 +202,125 @@ public class ReleaseOrchestratorTests
         Assert.Equal("3.0.1", inputs["version"]);
         Assert.Equal("v3.0.1", inputs["ref_tag"]);
         Assert.Empty(_git.CreatedTags); // dispatch model does not tag locally
+    }
+
+    [Fact]
+    public async Task WhenSeveralRunsMatch_TheChoiceIsReportedRatherThanMadeSilently()
+    {
+        // A release watches one run. If the tag started more than one, say so —
+        // otherwise the extra runs are invisible.
+        _git.Tags = ["v1.0.0"];
+        _github.RunIdToReturn = 4242;
+        _github.CandidateCount = 3;
+        var request = new ReleaseRequest { Project = TagPushProject(), Bump = VersionBump.Patch };
+        var events = new List<ReleaseEvent>();
+
+        await CreateSut().RunAsync(request, new SyncProgress<ReleaseEvent>(events.Add));
+
+        var locate = events.Last(e => e.Key == ReleaseProgressKeys.LocateRun);
+        Assert.Contains("3", locate.Message);
+    }
+
+    [Fact]
+    public async Task ASingleMatchingRunIsReportedPlainly()
+    {
+        _git.Tags = ["v1.0.0"];
+        _github.RunIdToReturn = 4242;
+        _github.CandidateCount = 1;
+        var request = new ReleaseRequest { Project = TagPushProject(), Bump = VersionBump.Patch };
+        var events = new List<ReleaseEvent>();
+
+        await CreateSut().RunAsync(request, new SyncProgress<ReleaseEvent>(events.Add));
+
+        var locate = events.Last(e => e.Key == ReleaseProgressKeys.LocateRun);
+        Assert.Equal(ReleaseProgressStatus.Succeeded, locate.Status);
+        Assert.DoesNotContain("其他", locate.Message ?? "");
+    }
+
+    [Fact]
+    public async Task ASuccessfulRelease_IsRecordedInTheLedger()
+    {
+        _git.Tags = ["v1.0.0"];
+        _git.PeeledCommit = "deadbeefcafe";
+        _github.RunIdToReturn = 4242;
+        var request = new ReleaseRequest { Project = TagPushProject(), Bump = VersionBump.Patch };
+
+        await CreateSut().RunAsync(request);
+
+        var entry = Assert.Single(_ledger.Entries);
+        Assert.Equal("v1.0.1", entry.Tag);
+        Assert.Equal("1.0.1", entry.Version);
+        Assert.True(entry.Succeeded);
+        Assert.Equal(4242, entry.RunId);
+        Assert.Equal("deadbeefcafe", entry.CommitSha);
+    }
+
+    [Fact]
+    public async Task ADryRunIsNotRecorded()
+    {
+        // Nothing left the machine, so there is nothing to remember.
+        _git.Tags = ["v1.0.0"];
+        var request = new ReleaseRequest { Project = TagPushProject(), Bump = VersionBump.Patch, DryRun = true };
+
+        await CreateSut().RunAsync(request);
+
+        Assert.Empty(_ledger.Entries);
+    }
+
+    [Fact]
+    public async Task AReleaseThatNeverReachedGitHub_IsNotRecorded()
+    {
+        _git.Clean = false;   // fails preflight, long before anything is pushed
+        var request = new ReleaseRequest { Project = TagPushProject(), Bump = VersionBump.Patch };
+
+        await CreateSut().RunAsync(request);
+
+        Assert.Empty(_ledger.Entries);
+    }
+
+    [Fact]
+    public async Task StepNamedAfterABuiltInStage_StaysItsOwnRow()
+    {
+        // A step's name is a label, not an identity. Naming one "Tag" must not
+        // merge it into the built-in Tag stage and overwrite that status.
+        _git.Tags = ["v1.0.0"];
+        var request = new ReleaseRequest { Project = TagPushProject(PsStep("Tag")), Bump = VersionBump.Patch };
+        var events = new List<ReleaseEvent>();
+
+        await CreateSut().RunAsync(request, new SyncProgress<ReleaseEvent>(events.Add));
+
+        var stageEvents = events.Where(e => e.Key == ReleaseProgressKeys.Tag).ToList();
+        var stepEvents = events.Where(e => e.Key != ReleaseProgressKeys.Tag && e.Label == "Tag").ToList();
+
+        Assert.NotEmpty(stageEvents);
+        Assert.NotEmpty(stepEvents);
+    }
+
+    [Fact]
+    public async Task TwoStepsSharingAName_GetDistinctKeys()
+    {
+        _git.Tags = ["v1.0.0"];
+        var project = TagPushProject(PsStep("build"), PsStep("build"));
+        var request = new ReleaseRequest { Project = project, Bump = VersionBump.Patch };
+        var events = new List<ReleaseEvent>();
+
+        await CreateSut().RunAsync(request, new SyncProgress<ReleaseEvent>(events.Add));
+
+        var keys = events.Where(e => e.Label == "build").Select(e => e.Key).Distinct().ToList();
+        Assert.Equal(2, keys.Count);
+    }
+
+    [Fact]
+    public async Task UnnamedStep_IsLabelledByItsPosition()
+    {
+        _git.Tags = ["v1.0.0"];
+        var blank = new ReleaseStep { Name = "", Interpreter = StepInterpreter.PowerShell, Command = "echo hi" };
+        var request = new ReleaseRequest { Project = TagPushProject(blank), Bump = VersionBump.Patch };
+        var events = new List<ReleaseEvent>();
+
+        await CreateSut().RunAsync(request, new SyncProgress<ReleaseEvent>(events.Add));
+
+        Assert.Contains(events, e => e.Label == "步驟 1");
     }
 
     [Fact]
@@ -231,6 +381,26 @@ public class ReleaseOrchestratorTests
 
 // ---- Hand-rolled fakes (no mocking framework) ----
 
+sealed class FakeReleaseLedger : IReleaseLedger
+{
+    public List<LedgerEntry> Entries = [];
+
+    public Task<IReadOnlyList<LedgerEntry>> ListAsync(Guid projectId, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<LedgerEntry>>([.. Entries.Where(e => e.ProjectId == projectId)]);
+
+    public Task AppendAsync(LedgerEntry entry, CancellationToken ct = default)
+    {
+        Entries.Add(entry);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Reports on the calling thread, so assertions see every event.</summary>
+sealed class SyncProgress<T>(Action<T> on) : IProgress<T>
+{
+    public void Report(T value) => on(value);
+}
+
 sealed class FakeGitService : IGitService
 {
     public bool IsRepo = true;
@@ -277,6 +447,7 @@ sealed class FakeProcessRunner : IProcessRunner
 sealed class FakeGitHubActionsService : IGitHubActionsService
 {
     public long? RunIdToReturn = 999;
+    public int CandidateCount = 1;
     public int DispatchCount;
     public List<RunQuery> Queries = [];
     public List<IReadOnlyDictionary<string, string>> DispatchedInputs = [];
@@ -290,9 +461,13 @@ sealed class FakeGitHubActionsService : IGitHubActionsService
         DispatchedInputs.Add(inputs);
         return Task.CompletedTask;
     }
-    public Task<long?> FindRunAsync(RunQuery query, CancellationToken ct = default) { Queries.Add(query); return Task.FromResult(RunIdToReturn); }
+    public Task<RunMatch?> FindRunAsync(RunQuery query, CancellationToken ct = default)
+    {
+        Queries.Add(query);
+        return Task.FromResult(RunIdToReturn is { } id ? new RunMatch(id, CandidateCount) : null);
+    }
     public Task<WorkflowRunSnapshot?> GetRunSnapshotAsync(string o, string r, long id, CancellationToken ct = default) => Task.FromResult<WorkflowRunSnapshot?>(null);
     public Task<string> GetJobLogsAsync(string o, string r, long id, CancellationToken ct = default) => Task.FromResult(string.Empty);
-    public Task<IReadOnlySet<string>> GetReleaseTagsAsync(string o, string r, CancellationToken ct = default) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
-    public Task<bool> DeleteReleaseForTagAsync(string o, string r, string tag, CancellationToken ct = default) => Task.FromResult(false);
+    public Task<IReadOnlySet<string>> GetGitHubReleaseTagsAsync(string o, string r, CancellationToken ct = default) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
+    public Task<bool> DeleteGitHubReleaseForTagAsync(string o, string r, string tag, CancellationToken ct = default) => Task.FromResult(false);
 }

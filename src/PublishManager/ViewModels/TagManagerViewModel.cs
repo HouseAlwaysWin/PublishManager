@@ -19,7 +19,7 @@ public partial class TagRowViewModel(VersionTag tag) : ViewModelBase
 
     [ObservableProperty] private bool _isSelected;
 
-    /// <summary>Compact "where it exists" summary, e.g. "本機 · 遠端 · Release".</summary>
+    /// <summary>Compact "where it exists" summary, e.g. "本機 · 遠端 · GitHub Release".</summary>
     public string Locations
     {
         get
@@ -27,7 +27,7 @@ public partial class TagRowViewModel(VersionTag tag) : ViewModelBase
             var parts = new List<string>(3);
             if (Tag.ExistsLocally) parts.Add("本機");
             if (Tag.ExistsOnRemote) parts.Add("遠端");
-            if (Tag.HasGitHubRelease) parts.Add("Release");
+            if (Tag.HasGitHubRelease) parts.Add("GitHub Release");
             return parts.Count == 0 ? "—" : string.Join(" · ", parts);
         }
     }
@@ -52,7 +52,7 @@ public partial class TagManagerViewModel : ViewModelBase
 
     public ObservableCollection<TagRowViewModel> Tags { get; } = [];
 
-    [ObservableProperty] private string _title = "Tag / 版本管理";
+    [ObservableProperty] private string _title = "Tag 管理";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string? _status;
     [ObservableProperty] private bool _deleteLocal = true;
@@ -75,7 +75,7 @@ public partial class TagManagerViewModel : ViewModelBase
     public void Initialize(Project project)
     {
         _project = project;
-        Title = $"Tag / 版本管理 — {project.Name}";
+        Title = $"Tag 管理 — {project.Name}";
         _ = RefreshAsync();
     }
 

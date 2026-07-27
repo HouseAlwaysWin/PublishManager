@@ -13,6 +13,15 @@
         Width="1040" Height="700"
         Title="PublishManager — GitHub Action 發版管理">
 
+  <DockPanel>
+
+    <!-- Failures the user must know about, e.g. configuration not saving -->
+    <Border DockPanel.Dock="Top" Background="#33F85149" BorderBrush="#F85149" BorderThickness="0,0,0,1"
+            Padding="12,8"
+            IsVisible="{Binding Problem, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" />
+    </Border>
+
     <Grid ColumnDefinitions="320,*">
 
         <!-- Sidebar: project list -->
@@ -53,36 +62,33 @@
                         <TextBlock Text="{Binding SelectedProject.Name}" FontSize="22" FontWeight="Bold" />
 
                         <Border Background="#11808080" CornerRadius="6" Padding="14">
-                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
                                   RowSpacing="8">
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="本機路徑" FontWeight="SemiBold" Opacity="0.7" />
                                 <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedProject.LocalPath}" TextWrapping="Wrap" />
 
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="專案類型" FontWeight="SemiBold" Opacity="0.7" />
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedProject.Kind}" />
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="觸發方式" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedProject.Trigger}" />
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="發版模型" FontWeight="SemiBold" Opacity="0.7" />
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedProject.ReleaseModel}" />
-
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Tag 前綴 / 遞增" FontWeight="SemiBold" Opacity="0.7" />
-                                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Tag 前綴 / 遞增" FontWeight="SemiBold" Opacity="0.7" />
+                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10">
                                     <TextBlock Text="{Binding SelectedProject.TagPrefix}" />
                                     <TextBlock Text="{Binding SelectedProject.DefaultBump}" Opacity="0.7" />
                                 </StackPanel>
 
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Owner / Repo" FontWeight="SemiBold" Opacity="0.7" />
-                                <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Owner / Repo" FontWeight="SemiBold" Opacity="0.7" />
+                                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="6">
                                     <TextBlock Text="{Binding SelectedProject.Owner, TargetNullValue='（從 remote 推導）'}" />
                                     <TextBlock Text="/" Opacity="0.4"
                                                IsVisible="{Binding SelectedProject.Repo, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
                                     <TextBlock Text="{Binding SelectedProject.Repo, TargetNullValue=''}" />
                                 </StackPanel>
 
-                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Workflow 檔" FontWeight="SemiBold" Opacity="0.7" />
-                                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedProject.WorkflowFile, TargetNullValue='（未設定）'}" />
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Workflow 檔" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedProject.WorkflowFile, TargetNullValue='（未設定）'}" />
 
-                                <TextBlock Grid.Row="6" Grid.Column="0" Text="發版步驟數" FontWeight="SemiBold" Opacity="0.7" />
-                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedProject.Steps.Count}" />
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="發版步驟數" FontWeight="SemiBold" Opacity="0.7" />
+                                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedProject.Steps.Count}" />
                             </Grid>
                         </Border>
 
@@ -116,7 +122,8 @@
                                     <Button Content="發版" Command="{Binding Release.ReleaseCommand}" Classes="accent" />
                                     <Button Content="取消" Command="{Binding Release.CancelCommand}"
                                             IsVisible="{Binding Release.IsReleasing}" />
-                                    <Button Content="Tag / 版本管理" Command="{Binding ManageTagsCommand}" />
+                                    <Button Content="Tag 管理" Command="{Binding ManageTagsCommand}" />
+                                    <Button Content="發版歷史" Command="{Binding ShowLedgerCommand}" />
                                 </StackPanel>
 
                                 <TextBlock Text="{Binding Release.StatusMessage}" TextWrapping="Wrap"
@@ -124,11 +131,11 @@
 
                                 <ItemsControl ItemsSource="{Binding Release.Stages}">
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:ReleaseStageViewModel">
+                                        <DataTemplate x:DataType="vm:ReleaseProgressRowViewModel">
                                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,1">
                                                 <TextBlock Text="{Binding Glyph}" Foreground="{Binding GlyphBrush}"
                                                            FontWeight="Bold" Width="16" />
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Width="94" />
+                                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" Width="94" />
                                                 <TextBlock Text="{Binding Message}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
                                         </DataTemplate>
@@ -156,4 +163,5 @@
             </Panel>
         </Border>
     </Grid>
+  </DockPanel>
 </Window>

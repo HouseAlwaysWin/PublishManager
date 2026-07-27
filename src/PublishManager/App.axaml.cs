@@ -4,7 +4,10 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using PublishManager.Core;
+using PublishManager.Core.Diagnostics;
+using PublishManager.Core.Storage;
 using PublishManager.ViewModels;
 using PublishManager.Views;
 
@@ -25,6 +28,10 @@ public partial class App : Application
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddPublishManagerCore();
         builder.Services.AddViewModels();
+
+        // This is a WinExe with no console attached, so the default providers
+        // write nowhere. Without a file sink, every logged failure is invisible.
+        builder.Logging.AddProvider(new FileLoggerProvider(StorageOptions.Default.LogDirectory));
 
         var host = builder.Build();
         Services = host.Services;
