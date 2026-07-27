@@ -16,6 +16,9 @@ public interface IGitService
     /// <summary>Current branch name (e.g. "main"), or "HEAD" when detached.</summary>
     Task<string> GetCurrentBranchAsync(string repoPath, CancellationToken ct = default);
 
+    /// <summary>Local and remote branch names, offered as release-source suggestions.</summary>
+    Task<IReadOnlyList<string>> ListBranchesAsync(string repoPath, CancellationToken ct = default);
+
     /// <summary>True when there are no uncommitted changes (porcelain status empty).</summary>
     Task<bool> IsWorkingTreeCleanAsync(string repoPath, CancellationToken ct = default);
 
@@ -38,8 +41,18 @@ public interface IGitService
     /// <summary>True if the tag already exists on the remote (checked via <c>ls-remote</c>).</summary>
     Task<bool> RemoteTagExistsAsync(string repoPath, string tag, string remote = "origin", CancellationToken ct = default);
 
-    /// <summary>Creates an annotated tag at HEAD.</summary>
-    Task CreateAnnotatedTagAsync(string repoPath, string tag, string message, CancellationToken ct = default);
+    /// <summary>
+    /// Resolves a branch, tag, or commit-ish to its commit sha, or null when it
+    /// names nothing in this repository.
+    /// </summary>
+    Task<string?> ResolveCommitAsync(string repoPath, string rev, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates an annotated tag on <paramref name="target"/>, or at HEAD when it
+    /// is null. Tagging another commit never moves the working copy.
+    /// </summary>
+    Task CreateAnnotatedTagAsync(
+        string repoPath, string tag, string message, string? target = null, CancellationToken ct = default);
 
     /// <summary>Pushes a single tag to the remote. Uses git's own credentials (not the gh token).</summary>
     Task PushTagAsync(string repoPath, string tag, string remote = "origin", CancellationToken ct = default);

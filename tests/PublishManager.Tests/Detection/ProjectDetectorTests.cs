@@ -120,7 +120,9 @@ sealed class StubGitService : IGitService
     public Task<RepoSlug?> GetRemoteSlugAsync(string p, string remote = "origin", CancellationToken ct = default) => Task.FromResult(Slug);
     public Task FetchTagsAsync(string p, string remote = "origin", CancellationToken ct = default) => Task.CompletedTask;
     public Task<bool> RemoteTagExistsAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) => Task.FromResult(false);
-    public Task CreateAnnotatedTagAsync(string p, string tag, string msg, CancellationToken ct = default) => Task.CompletedTask;
+    public Task CreateAnnotatedTagAsync(string p, string tag, string msg, string? target = null, CancellationToken ct = default) => Task.CompletedTask;
+    public Task<IReadOnlyList<string>> ListBranchesAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
+    public Task<string?> ResolveCommitAsync(string p, string rev, CancellationToken ct = default) => Task.FromResult<string?>("sha");
     public Task PushTagAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) => Task.CompletedTask;
     public Task DeleteLocalTagAsync(string p, string tag, CancellationToken ct = default) => Task.CompletedTask;
     public Task DeleteRemoteTagAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) => Task.CompletedTask;

@@ -103,6 +103,16 @@
                                         <TextBlock Text="目前:" Opacity="0.7" />
                                         <TextBlock Text="{Binding Release.CurrentVersion}" FontWeight="SemiBold" />
                                     </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <TextBlock Text="發版來源" Opacity="0.7" VerticalAlignment="Center" />
+                                        <AutoCompleteBox Text="{Binding Release.Source}"
+                                                         ItemsSource="{Binding Release.Branches}"
+                                                         FilterMode="Contains" MinWidth="260"
+                                                         PlaceholderText="留空 = 目前 checkout;可填分支 / tag / commit" />
+                                        <TextBlock Text="{Binding Release.Branch, StringFormat='(目前: {0})'}"
+                                                   Opacity="0.5" FontSize="11" VerticalAlignment="Center" />
+                                    </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                         <CheckBox Content="手動指定版號" IsChecked="{Binding Release.UseManualVersion}"
                                                   VerticalAlignment="Center" />

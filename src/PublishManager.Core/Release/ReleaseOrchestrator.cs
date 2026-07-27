@@ -58,15 +58,46 @@ public sealed class ReleaseOrchestrator(
                 return Fail(events, ReleaseProgressKeys.Preflight, "Preflight", "工作目錄有未提交的變更,請先 commit 或 stash。", dry);
 
             var branch = await _git.GetCurrentBranchAsync(project.LocalPath, ct);
-            if (!string.IsNullOrWhiteSpace(project.ReleaseBranch) &&
+            var source = string.IsNullOrWhiteSpace(request.Source) ? null : request.Source.Trim();
+
+            // The "must be on this branch" rule exists because a release follows
+            // the working copy. Naming a source says where to release from, so
+            // the rule no longer applies.
+            if (source is null &&
+                !string.IsNullOrWhiteSpace(project.ReleaseBranch) &&
                 !string.Equals(branch, project.ReleaseBranch, StringComparison.Ordinal))
             {
                 return Fail(events, ReleaseProgressKeys.Preflight, "Preflight",
                     $"目前分支為 '{branch}',需切換到 '{project.ReleaseBranch}' 才能發版。", dry);
             }
 
+            string? sourceCommit = null;
+            if (source is not null)
+            {
+                sourceCommit = await _git.ResolveCommitAsync(project.LocalPath, source, ct);
+                if (sourceCommit is null)
+                {
+                    return Fail(events, ReleaseProgressKeys.Preflight, "Preflight",
+                        $"找不到發版來源 '{source}'(不是有效的分支、tag 或 commit)。", dry);
+                }
+            }
+
             var slug = await ResolveSlugAsync(project, ct);
-            Report(events, ReleaseProgressKeys.Preflight, "Preflight", ReleaseProgressStatus.Succeeded, $"分支 {branch}");
+
+            var preflightNote = source is null
+                ? $"分支 {branch}"
+                : $"來源 {source} ({Short(sourceCommit)})";
+
+            // Steps build the working copy, which is not where the release is
+            // being cut from — say so rather than quietly shipping a mismatch.
+            if (source is not null && project.Steps.Count > 0)
+            {
+                var head = await _git.GetHeadShaAsync(project.LocalPath, ct);
+                if (!string.Equals(head, sourceCommit, StringComparison.OrdinalIgnoreCase))
+                    preflightNote += $" ⚠ 本機步驟建置的是工作目錄({Short(head)}),與發版來源不同";
+            }
+
+            Report(events, ReleaseProgressKeys.Preflight, "Preflight", ReleaseProgressStatus.Succeeded, preflightNote);
 
             // ---- Version ----
             Report(events, ReleaseProgressKeys.Version, "Version", ReleaseProgressStatus.Running);
@@ -138,7 +169,7 @@ public sealed class ReleaseOrchestrator(
                 }
                 else
                 {
-                    await _git.CreateAnnotatedTagAsync(project.LocalPath, nextTag, $"Release {nextTag}", ct);
+                    await _git.CreateAnnotatedTagAsync(project.LocalPath, nextTag, $"Release {nextTag}", sourceCommit, ct);
                     await _git.PushTagAsync(project.LocalPath, nextTag, ct: ct);
                     Report(events, ReleaseProgressKeys.Tag, "Tag", ReleaseProgressStatus.Succeeded, $"已推送 {nextTag}");
 
@@ -153,7 +184,15 @@ public sealed class ReleaseOrchestrator(
                 if (string.IsNullOrWhiteSpace(project.WorkflowFile))
                     return Fail(events, ReleaseProgressKeys.Dispatch, "Dispatch", "未設定 Workflow 檔,無法 dispatch。", dry);
 
-                var gitRef = string.IsNullOrWhiteSpace(project.ReleaseBranch) ? branch : project.ReleaseBranch!;
+                // workflow_dispatch takes a branch or tag ref — GitHub cannot
+                // dispatch a bare commit, so refuse rather than fail obscurely.
+                if (source is not null && string.Equals(source, sourceCommit, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Fail(events, ReleaseProgressKeys.Dispatch, "Dispatch",
+                        $"GitHub 的 workflow_dispatch 只接受分支或 tag,不能用 commit '{Short(source)}'。請改指定分支或 tag。", dry);
+                }
+
+                var gitRef = source ?? (string.IsNullOrWhiteSpace(project.ReleaseBranch) ? branch : project.ReleaseBranch!);
                 var inputs = BuildDispatchInputs(project.DispatchInputs, nextVersion, nextTag);
 
                 if (dry)
@@ -201,7 +240,7 @@ public sealed class ReleaseOrchestrator(
 
             record.RunId = runId;
             if (record.Reached)
-                record.CommitSha = await TryPeelAsync(project, nextTag, ct);
+                record.CommitSha = sourceCommit ?? await TryPeelAsync(project, nextTag, ct);
             await RecordAsync(project, record, succeeded: true, error: null, ct);
 
             return new ReleaseResult
@@ -403,6 +442,10 @@ public sealed class ReleaseOrchestrator(
 
     private static string ResolveDirectory(string basePath, string dir) =>
         Path.IsPathRooted(dir) ? dir : Path.Combine(basePath, dir);
+
+    /// <summary>Abbreviates a sha for display; leaves anything shorter alone.</summary>
+    private static string Short(string? sha) =>
+        sha is { Length: > 7 } ? sha[..7] : sha ?? string.Empty;
 
     private static string StripPrefix(string tag, string prefix) =>
         !string.IsNullOrEmpty(prefix) && tag.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)

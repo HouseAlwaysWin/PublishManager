@@ -205,6 +205,144 @@ public class ReleaseOrchestratorTests
     }
 
     [Fact]
+    public async Task ByDefault_TheTagLandsOnWhateverIsCheckedOut()
+    {
+        _git.Tags = ["v1.0.0"];
+        var request = new ReleaseRequest { Project = TagPushProject(), Bump = VersionBump.Patch };
+
+        await CreateSut().RunAsync(request);
+
+        Assert.Equal(("v1.0.1", null), Assert.Single(_git.CreatedTagTargets));
+    }
+
+    [Fact]
+    public async Task AnExplicitSource_PutsTheTagOnThatCommitWithoutCheckingItOut()
+    {
+        _git.Tags = ["v1.0.0"];
+        _git.Resolvable["release/1.x"] = "cafebabe1234";
+        var request = new ReleaseRequest
+        {
+            Project = TagPushProject(),
+            Bump = VersionBump.Patch,
+            Source = "release/1.x",
+        };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(("v1.0.1", "cafebabe1234"), Assert.Single(_git.CreatedTagTargets));
+        Assert.Empty(_git.CheckedOut);   // the working copy is never moved
+    }
+
+    [Fact]
+    public async Task AnUnknownSource_FailsBeforeAnythingIsTagged()
+    {
+        _git.Tags = ["v1.0.0"];
+        var request = new ReleaseRequest
+        {
+            Project = TagPushProject(),
+            Bump = VersionBump.Patch,
+            Source = "no-such-branch",
+        };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Contains("no-such-branch", result.Error);
+        Assert.Empty(_git.CreatedTags);
+    }
+
+    [Fact]
+    public async Task AnExplicitSource_LiftsTheMustBeOnThisBranchRule()
+    {
+        // The rule exists because the release follows the working copy. Naming a
+        // source says where to release from, so standing elsewhere is fine.
+        _git.Tags = ["v1.0.0"];
+        _git.Branch = "some-feature";           // project requires "main"
+        _git.Resolvable["main"] = "deadbeef99";
+        var request = new ReleaseRequest
+        {
+            Project = TagPushProject(),
+            Bump = VersionBump.Patch,
+            Source = "main",
+        };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Contains("v1.0.1", _git.PushedTags);
+    }
+
+    [Fact]
+    public async Task TheSourceCommitIsWhatGetsRecorded()
+    {
+        _git.Tags = ["v1.0.0"];
+        _git.Resolvable["release/1.x"] = "cafebabe1234";
+        var request = new ReleaseRequest
+        {
+            Project = TagPushProject(),
+            Bump = VersionBump.Patch,
+            Source = "release/1.x",
+        };
+
+        await CreateSut().RunAsync(request);
+
+        Assert.Equal("cafebabe1234", Assert.Single(_ledger.Entries).CommitSha);
+    }
+
+    [Fact]
+    public async Task DispatchingFromABareCommit_IsRefusedBecauseGitHubCannotDoIt()
+    {
+        // workflow_dispatch takes a branch or tag ref, never a commit sha.
+        _git.Tags = ["v1.0.0"];
+        _git.Resolvable["cafebabe1234"] = "cafebabe1234";
+        var project = TagPushProject();
+        project.Trigger = ReleaseTrigger.WorkflowDispatch;
+        var request = new ReleaseRequest { Project = project, Bump = VersionBump.Patch, Source = "cafebabe1234" };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.False(result.Success);
+        Assert.Equal(0, _github.DispatchCount);
+    }
+
+    [Fact]
+    public async Task DispatchingFromANamedBranch_UsesItAsTheRef()
+    {
+        _git.Tags = ["v1.0.0"];
+        _git.Resolvable["release/1.x"] = "cafebabe1234";
+        var project = TagPushProject();
+        project.Trigger = ReleaseTrigger.WorkflowDispatch;
+        var request = new ReleaseRequest { Project = project, Bump = VersionBump.Patch, Source = "release/1.x" };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal("release/1.x", Assert.Single(_github.DispatchedRefs));
+    }
+
+    [Fact]
+    public async Task StepsBuildTheWorkingCopy_SoReleasingElsewhereWarns()
+    {
+        _git.Tags = ["v1.0.0"];
+        _git.HeadSha = "aaaaaaa";
+        _git.Resolvable["release/1.x"] = "cafebabe1234";
+        var request = new ReleaseRequest
+        {
+            Project = TagPushProject(PsStep()),
+            Bump = VersionBump.Patch,
+            Source = "release/1.x",
+        };
+        var events = new List<ReleaseEvent>();
+
+        var result = await CreateSut().RunAsync(request, new SyncProgress<ReleaseEvent>(events.Add));
+
+        Assert.True(result.Success);
+        var preflight = events.Last(e => e.Key == ReleaseProgressKeys.Preflight);
+        Assert.Contains("工作目錄", preflight.Message);
+    }
+
+    [Fact]
     public async Task WhenSeveralRunsMatch_TheChoiceIsReportedRatherThanMadeSilently()
     {
         // A release watches one run. If the tag started more than one, say so —
@@ -412,7 +550,10 @@ sealed class FakeGitService : IGitService
     public string HeadSha = "abc123";
     public string PeeledCommit = "abc123";
     public List<string> CreatedTags = [];
+    public List<(string Tag, string? Target)> CreatedTagTargets = [];
     public List<string> PushedTags = [];
+    public List<string> CheckedOut = [];
+    public Dictionary<string, string> Resolvable = [];
 
     public Task<bool> IsGitRepositoryAsync(string p, CancellationToken ct = default) => Task.FromResult(IsRepo);
     public Task<IReadOnlyList<string>> ListTagsAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(Tags);
@@ -423,7 +564,16 @@ sealed class FakeGitService : IGitService
     public Task<RepoSlug?> GetRemoteSlugAsync(string p, string remote = "origin", CancellationToken ct = default) => Task.FromResult(Slug);
     public Task FetchTagsAsync(string p, string remote = "origin", CancellationToken ct = default) => Task.CompletedTask;
     public Task<bool> RemoteTagExistsAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) => Task.FromResult(RemoteTagExists);
-    public Task CreateAnnotatedTagAsync(string p, string tag, string msg, CancellationToken ct = default) { CreatedTags.Add(tag); return Task.CompletedTask; }
+    public Task CreateAnnotatedTagAsync(string p, string tag, string msg, string? target = null, CancellationToken ct = default)
+    {
+        CreatedTags.Add(tag);
+        CreatedTagTargets.Add((tag, target));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<string>> ListBranchesAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
+    public Task<string?> ResolveCommitAsync(string p, string rev, CancellationToken ct = default) =>
+        Task.FromResult(Resolvable.TryGetValue(rev, out var sha) ? sha : null);
     public Task PushTagAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) { PushedTags.Add(tag); return Task.CompletedTask; }
     public Task DeleteLocalTagAsync(string p, string tag, CancellationToken ct = default) => Task.CompletedTask;
     public Task DeleteRemoteTagAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) => Task.CompletedTask;
@@ -451,6 +601,7 @@ sealed class FakeGitHubActionsService : IGitHubActionsService
     public int DispatchCount;
     public List<RunQuery> Queries = [];
     public List<IReadOnlyDictionary<string, string>> DispatchedInputs = [];
+    public List<string> DispatchedRefs = [];
     public GitHubAuthStatus Status = new(true, "tester", ["repo", "workflow"], "gh");
 
     public Task<GitHubAuthStatus> GetAuthStatusAsync(CancellationToken ct = default) => Task.FromResult(Status);
@@ -459,6 +610,7 @@ sealed class FakeGitHubActionsService : IGitHubActionsService
     {
         DispatchCount++;
         DispatchedInputs.Add(inputs);
+        DispatchedRefs.Add(gitRef);
         return Task.CompletedTask;
     }
     public Task<RunMatch?> FindRunAsync(RunQuery query, CancellationToken ct = default)

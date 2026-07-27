@@ -50,6 +50,12 @@ public sealed record ReleaseRequest
     /// </summary>
     public string? ExplicitVersion { get; init; }
 
+    /// <summary>
+    /// Branch, tag, or commit to cut the release from. Null releases whatever is
+    /// checked out. Naming one never changes the working copy.
+    /// </summary>
+    public string? Source { get; init; }
+
     /// <summary>When true, compute and run everything except side effects (tag push / dispatch).</summary>
     public bool DryRun { get; init; }
 }

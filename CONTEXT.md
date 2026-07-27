@@ -36,6 +36,12 @@ _Avoid_: History, audit log
 One execution of a project's release flow, performed by this app.
 _Avoid_: Publish, deploy, ship
 
+**Release Source**:
+The commit a Release is cut from, given as a branch, tag, or commit sha, and
+defaulting to whatever is checked out. Naming one never changes the working
+copy — the tag is written straight onto that commit.
+_Avoid_: Target, ref, base
+
 **Release Trigger**:
 How a project starts its Workflow Run — by pushing a tag, or by dispatching the
 workflow directly. Chosen per project.

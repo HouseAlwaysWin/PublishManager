@@ -37,6 +37,14 @@ dotnet test PublishManager.slnx
 
 一次發版只會監看**一個** workflow run;若偵測到 repo 裡還有其他吃 tag push 的 workflow,新增/編輯專案時會明確警告。
 
+### 發版來源(從哪個 branch / commit 發版)
+發版面板的「**發版來源**」可填**分支、tag 或 commit sha**;留空就是目前 checkout 的東西。輸入框會提示本機與遠端分支。
+
+- **不會動你的工作目錄** —— tag 直接打在指定的 commit 上(`git tag -a <tag> <commit>`),不做 checkout
+- 指定來源後,「必須在某分支上才能發版」的限制**自動解除**(那條規則的前提是「發版跟著工作目錄走」)
+- **WorkflowDispatch 只能用分支或 tag** —— 這是 GitHub API 的限制,填 commit sha 會被明確擋下
+- 若專案有本機步驟,而來源不是目前的 HEAD,preflight 會**警告**:步驟建置的是工作目錄,與發版來源不同
+
 ### Dry-run
 Dry-run 會**實際執行所有本機步驟**,只保留不可逆的部分不做(不推 tag、不 dispatch、不建立 GitHub Release),所以它回答的是「**這次發版會不會成功**」。
 

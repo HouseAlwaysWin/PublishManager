@@ -30,6 +30,19 @@ public sealed class GitService(IProcessRunner runner, ILogger<GitService> logger
         return result.StdOutText;
     }
 
+    public async Task<IReadOnlyList<string>> ListBranchesAsync(string repoPath, CancellationToken ct = default)
+    {
+        var result = await RunCheckedAsync(repoPath, ct,
+            "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes").ConfigureAwait(false);
+
+        return result.StdOut
+            .Select(l => l.Trim())
+            // origin/HEAD is a symbolic pointer, not somewhere to release from.
+            .Where(l => l.Length > 0 && !l.EndsWith("/HEAD", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
     public async Task<bool> IsWorkingTreeCleanAsync(string repoPath, CancellationToken ct = default)
     {
         var result = await RunCheckedAsync(repoPath, ct, "status", "--porcelain").ConfigureAwait(false);
@@ -72,9 +85,23 @@ public sealed class GitService(IProcessRunner runner, ILogger<GitService> logger
         return result.StdOutText.Length > 0;
     }
 
-    public async Task CreateAnnotatedTagAsync(string repoPath, string tag, string message, CancellationToken ct = default)
+    public async Task<string?> ResolveCommitAsync(string repoPath, string rev, CancellationToken ct = default)
     {
-        await RunCheckedAsync(repoPath, ct, "tag", "-a", tag, "-m", message).ConfigureAwait(false);
+        // "^{commit}" peels annotated tags and rejects anything that is not a commit.
+        var result = await RunAsync(repoPath, ct, "rev-parse", "--verify", "--quiet", $"{rev}^{{commit}}")
+            .ConfigureAwait(false);
+
+        return result.Success && result.StdOutText.Length > 0 ? result.StdOutText : null;
+    }
+
+    public async Task CreateAnnotatedTagAsync(
+        string repoPath, string tag, string message, string? target = null, CancellationToken ct = default)
+    {
+        string[] args = string.IsNullOrWhiteSpace(target)
+            ? ["tag", "-a", tag, "-m", message]
+            : ["tag", "-a", tag, "-m", message, target];
+
+        await RunCheckedAsync(repoPath, ct, args).ConfigureAwait(false);
     }
 
     public async Task PushTagAsync(string repoPath, string tag, string remote = "origin", CancellationToken ct = default)

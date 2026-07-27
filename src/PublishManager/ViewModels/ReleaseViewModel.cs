@@ -78,6 +78,9 @@ public partial class ReleaseViewModel : ViewModelBase
     public WorkflowRunMonitorViewModel Monitor { get; }
 
     public ObservableCollection<ReleaseProgressRowViewModel> Stages { get; } = [];
+
+    /// <summary>Branch names offered as release-source suggestions.</summary>
+    public ObservableCollection<string> Branches { get; } = [];
     public VersionBump[] Bumps { get; } = Enum.GetValues<VersionBump>();
 
     [ObservableProperty] private Project? _project;
@@ -86,6 +89,12 @@ public partial class ReleaseViewModel : ViewModelBase
     [ObservableProperty] private string? _branch;
     [ObservableProperty] private VersionBump _bump;
     [ObservableProperty] private string? _nextVersionPreview;
+    /// <summary>
+    /// Branch, tag, or commit to release from. Empty means whatever is checked
+    /// out; naming one never changes the working copy.
+    /// </summary>
+    [ObservableProperty] private string _source = string.Empty;
+
     [ObservableProperty] private bool _useManualVersion;
     [ObservableProperty] private string _manualVersion = string.Empty;
     [ObservableProperty] private bool _dryRun;
@@ -169,6 +178,7 @@ public partial class ReleaseViewModel : ViewModelBase
 
             var branch = await _git.GetCurrentBranchAsync(project.LocalPath);
             var tags = await _git.ListTagsAsync(project.LocalPath);
+            var branches = await _git.ListBranchesAsync(project.LocalPath);
 
             // The user may have switched projects while we were awaiting git;
             // don't overwrite the newly selected project's info with stale data.
@@ -176,6 +186,9 @@ public partial class ReleaseViewModel : ViewModelBase
                 return;
 
             Branch = branch;
+            Branches.Clear();
+            foreach (var name in branches)
+                Branches.Add(name);
             var latest = _semver.GetLatest(tags, project.TagPrefix);
             CurrentVersion = latest is null ? "(尚無 tag)" : _semver.ToTag(latest, project.TagPrefix);
             NextVersionPreview = BuildPreview(project, tags);
@@ -248,6 +261,7 @@ public partial class ReleaseViewModel : ViewModelBase
                 Project = project,
                 Bump = Bump,
                 ExplicitVersion = UseManualVersion ? ManualVersion : null,
+                Source = Source,
                 DryRun = DryRun,
             };
             var result = await _orchestrator.RunAsync(request, events, log, _cts.Token);
