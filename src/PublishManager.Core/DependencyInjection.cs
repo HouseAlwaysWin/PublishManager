@@ -5,6 +5,7 @@ using PublishManager.Core.GitHub;
 using PublishManager.Core.Processes;
 using PublishManager.Core.Release;
 using PublishManager.Core.Storage;
+using PublishManager.Core.Tags;
 using PublishManager.Core.Versioning;
 
 namespace PublishManager.Core;
@@ -29,6 +30,7 @@ public static class CoreServiceCollectionExtensions
         services.AddSingleton<IGitHubActionsService, GitHubActionsService>();
 
         services.AddSingleton<IReleaseOrchestrator, ReleaseOrchestrator>();
+        services.AddSingleton<ITagService, TagService>();
         return services;
     }
 }

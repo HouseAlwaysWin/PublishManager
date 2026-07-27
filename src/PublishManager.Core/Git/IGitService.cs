@@ -43,4 +43,13 @@ public interface IGitService
 
     /// <summary>Pushes a single tag to the remote. Uses git's own credentials (not the gh token).</summary>
     Task PushTagAsync(string repoPath, string tag, string remote = "origin", CancellationToken ct = default);
+
+    /// <summary>Deletes a tag locally. Succeeds quietly if it does not exist locally.</summary>
+    Task DeleteLocalTagAsync(string repoPath, string tag, CancellationToken ct = default);
+
+    /// <summary>Deletes a tag on the remote (<c>git push --delete</c>).</summary>
+    Task DeleteRemoteTagAsync(string repoPath, string tag, string remote = "origin", CancellationToken ct = default);
+
+    /// <summary>The commit each tag points at, plus its date, for the tag list UI.</summary>
+    Task<IReadOnlyList<TagInfo>> ListTagDetailsAsync(string repoPath, CancellationToken ct = default);
 }

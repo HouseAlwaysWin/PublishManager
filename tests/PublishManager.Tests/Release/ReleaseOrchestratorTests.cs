@@ -255,6 +255,10 @@ sealed class FakeGitService : IGitService
     public Task<bool> RemoteTagExistsAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) => Task.FromResult(RemoteTagExists);
     public Task CreateAnnotatedTagAsync(string p, string tag, string msg, CancellationToken ct = default) { CreatedTags.Add(tag); return Task.CompletedTask; }
     public Task PushTagAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) { PushedTags.Add(tag); return Task.CompletedTask; }
+    public Task DeleteLocalTagAsync(string p, string tag, CancellationToken ct = default) => Task.CompletedTask;
+    public Task DeleteRemoteTagAsync(string p, string tag, string remote = "origin", CancellationToken ct = default) => Task.CompletedTask;
+    public Task<IReadOnlyList<TagInfo>> ListTagDetailsAsync(string p, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<TagInfo>>([.. Tags.Select(t => new TagInfo(t, "sha", null))]);
 }
 
 sealed class FakeProcessRunner : IProcessRunner
@@ -289,4 +293,6 @@ sealed class FakeGitHubActionsService : IGitHubActionsService
     public Task<long?> FindRunAsync(RunQuery query, CancellationToken ct = default) { Queries.Add(query); return Task.FromResult(RunIdToReturn); }
     public Task<WorkflowRunSnapshot?> GetRunSnapshotAsync(string o, string r, long id, CancellationToken ct = default) => Task.FromResult<WorkflowRunSnapshot?>(null);
     public Task<string> GetJobLogsAsync(string o, string r, long id, CancellationToken ct = default) => Task.FromResult(string.Empty);
+    public Task<IReadOnlySet<string>> GetReleaseTagsAsync(string o, string r, CancellationToken ct = default) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
+    public Task<bool> DeleteReleaseForTagAsync(string o, string r, string tag, CancellationToken ct = default) => Task.FromResult(false);
 }

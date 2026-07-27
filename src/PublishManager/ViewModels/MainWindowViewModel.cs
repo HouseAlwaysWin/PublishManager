@@ -42,6 +42,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EditProjectCommand))]
     [NotifyCanExecuteChangedFor(nameof(RemoveProjectCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ManageTagsCommand))]
     private Project? _selectedProject;
 
     public bool HasSelection => SelectedProject is not null;
@@ -112,6 +113,20 @@ public partial class MainWindowViewModel : ViewModelBase
             Projects[index] = edited;
         SelectedProject = edited;
         await SaveAsync();
+    }
+
+    /// <summary>Opens the tag/version manager for the selected project.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task ManageTagsAsync()
+    {
+        if (SelectedProject is null)
+            return;
+
+        await _dialogs.ShowTagManagerAsync(SelectedProject);
+
+        // Tags may have been deleted — refresh the release panel's version info.
+        if (Release is not null)
+            Release.UpdateProject(SelectedProject);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]

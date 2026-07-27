@@ -1,0 +1,88 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PublishManager.ViewModels"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="720" d:DesignHeight="620"
+        x:Class="PublishManager.Views.TagManagerWindow"
+        x:DataType="vm:TagManagerViewModel"
+        Width="720" Height="640"
+        WindowStartupLocation="CenterOwner"
+        Title="{Binding Title}">
+
+    <DockPanel Margin="16">
+
+        <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" FontSize="18" FontWeight="Bold" Margin="0,0,0,12" />
+
+        <!-- Footer: delete scope + actions -->
+        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
+
+            <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="刪除範圍" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <CheckBox Content="本機 tag" IsChecked="{Binding DeleteLocal}" />
+                        <CheckBox Content="遠端 tag" IsChecked="{Binding DeleteRemote}" />
+                        <CheckBox Content="GitHub Release" IsChecked="{Binding DeleteGitHubRelease}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Confirmation prompt -->
+            <Border IsVisible="{Binding IsConfirming}"
+                    Background="#22F85149" BorderBrush="#F85149" BorderThickness="1"
+                    CornerRadius="6" Padding="12">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="{Binding ConfirmMessage}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Content="取消" Command="{Binding CancelDeleteCommand}" />
+                        <Button Content="確定刪除" Command="{Binding ConfirmDeleteCommand}"
+                                Foreground="White" Background="#D32F2F" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.85"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding Status, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                <Button Grid.Column="1" Content="重新整理" Command="{Binding RefreshCommand}" Margin="0,0,8,0" />
+                <Button Grid.Column="2" Content="刪除選取" Command="{Binding RequestDeleteCommand}" Margin="0,0,8,0" />
+                <Button Grid.Column="3" Content="關閉" Click="OnCloseClick" MinWidth="70" />
+            </Grid>
+        </StackPanel>
+
+        <!-- Tag list -->
+        <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="6">
+            <Panel>
+                <ProgressBar IsIndeterminate="True" Height="4" VerticalAlignment="Top"
+                             IsVisible="{Binding IsBusy}" />
+
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Tags}" Margin="4">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TagRowViewModel">
+                                <Border Padding="8,6" Margin="2" CornerRadius="4" Background="#0C808080">
+                                    <Grid ColumnDefinitions="Auto,160,90,110,*">
+                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" Margin="0,0,6,0" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding ShortSha}" Opacity="0.6"
+                                                   FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{Binding DateText}" Opacity="0.6"
+                                                   FontSize="12" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="4" Text="{Binding Locations}"
+                                                   Foreground="{Binding LocationBrush}"
+                                                   FontSize="12" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Panel>
+        </Border>
+    </DockPanel>
+</Window>

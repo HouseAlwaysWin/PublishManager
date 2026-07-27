@@ -82,6 +82,46 @@ public sealed class GitService(IProcessRunner runner, ILogger<GitService> logger
         await RunCheckedAsync(repoPath, ct, "push", remote, tag).ConfigureAwait(false);
     }
 
+    public async Task DeleteLocalTagAsync(string repoPath, string tag, CancellationToken ct = default)
+    {
+        // Not an error if the tag only exists on the remote.
+        var result = await RunAsync(repoPath, ct, "tag", "-d", tag).ConfigureAwait(false);
+        if (!result.Success && !result.StdErrText.Contains("not found", StringComparison.OrdinalIgnoreCase))
+            throw new GitException($"刪除本機 tag '{tag}' 失敗:{result.StdErrText}");
+    }
+
+    public async Task DeleteRemoteTagAsync(string repoPath, string tag, string remote = "origin", CancellationToken ct = default)
+    {
+        await RunCheckedAsync(repoPath, ct, "push", remote, "--delete", $"refs/tags/{tag}").ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<TagInfo>> ListTagDetailsAsync(string repoPath, CancellationToken ct = default)
+    {
+        // %(objectname) on refs/tags is the tag object for annotated tags, so ask
+        // for the dereferenced commit and fall back to objectname for lightweight ones.
+        var result = await RunCheckedAsync(repoPath, ct,
+            "for-each-ref",
+            "--format=%(refname:short)\t%(objectname)\t%(*objectname)\t%(creatordate:iso-strict)",
+            "refs/tags").ConfigureAwait(false);
+
+        var tags = new List<TagInfo>();
+        foreach (var line in result.StdOut)
+        {
+            var parts = line.Split('\t');
+            if (parts.Length < 2 || parts[0].Length == 0)
+                continue;
+
+            var commit = parts.Length > 2 && parts[2].Length > 0 ? parts[2] : parts[1];
+            DateTimeOffset? date = parts.Length > 3 && DateTimeOffset.TryParse(parts[3], out var parsed)
+                ? parsed
+                : null;
+
+            tags.Add(new TagInfo(parts[0], commit, date));
+        }
+
+        return tags;
+    }
+
     private Task<ProcessResult> RunAsync(string repoPath, CancellationToken ct, params string[] args)
     {
         var request = new ProcessRequest

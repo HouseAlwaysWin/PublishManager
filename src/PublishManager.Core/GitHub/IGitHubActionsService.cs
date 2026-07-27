@@ -35,4 +35,13 @@ public interface IGitHubActionsService
 
     /// <summary>Fetches a completed job's full log text (returns partial/empty while running).</summary>
     Task<string> GetJobLogsAsync(string owner, string repo, long jobId, CancellationToken ct = default);
+
+    /// <summary>Tag names that have a published GitHub Release, so the UI can flag them.</summary>
+    Task<IReadOnlySet<string>> GetReleaseTagsAsync(string owner, string repo, CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes the GitHub Release published for <paramref name="tag"/>, if there
+    /// is one. Returns true when a release was actually deleted.
+    /// </summary>
+    Task<bool> DeleteReleaseForTagAsync(string owner, string repo, string tag, CancellationToken ct = default);
 }

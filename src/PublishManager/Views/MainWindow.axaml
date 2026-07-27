@@ -116,6 +116,7 @@
                                     <Button Content="發版" Command="{Binding Release.ReleaseCommand}" Classes="accent" />
                                     <Button Content="取消" Command="{Binding Release.CancelCommand}"
                                             IsVisible="{Binding Release.IsReleasing}" />
+                                    <Button Content="Tag / 版本管理" Command="{Binding ManageTagsCommand}" />
                                 </StackPanel>
 
                                 <TextBlock Text="{Binding Release.StatusMessage}" TextWrapping="Wrap"

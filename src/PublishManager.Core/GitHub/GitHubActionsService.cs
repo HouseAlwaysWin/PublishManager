@@ -144,6 +144,40 @@ public sealed class GitHubActionsService(IGitHubAuthProvider auth, ILogger<GitHu
         }
     }
 
+    public async Task<IReadOnlySet<string>> GetReleaseTagsAsync(string owner, string repo, CancellationToken ct = default)
+    {
+        var client = await GetClientAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var releases = await client.Repository.Release.GetAll(owner, repo).ConfigureAwait(false);
+            return releases.Select(r => r.TagName).ToHashSet(StringComparer.Ordinal);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Could not list releases for {Owner}/{Repo}.", owner, repo);
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+    }
+
+    public async Task<bool> DeleteReleaseForTagAsync(string owner, string repo, string tag, CancellationToken ct = default)
+    {
+        var client = await GetClientAsync(ct).ConfigureAwait(false);
+
+        // Fully qualified: "Release" is also this assembly's own namespace.
+        Octokit.Release release;
+        try
+        {
+            release = await client.Repository.Release.Get(owner, repo, tag).ConfigureAwait(false);
+        }
+        catch (NotFoundException)
+        {
+            return false;   // tag has no published release
+        }
+
+        await client.Repository.Release.Delete(owner, repo, release.Id).ConfigureAwait(false);
+        return true;
+    }
+
     private static JobSnapshot MapJob(WorkflowJob job) => new(
         job.Id,
         job.Name,

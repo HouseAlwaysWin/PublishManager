@@ -10,4 +10,7 @@ public interface IDialogService
     /// Pass <paramref name="existing"/> to edit (the result keeps the same Id), or null to add.
     /// </summary>
     Task<Project?> ShowProjectEditorAsync(Project? existing);
+
+    /// <summary>Opens the tag/version manager for <paramref name="project"/>.</summary>
+    Task ShowTagManagerAsync(Project project);
 }
