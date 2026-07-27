@@ -38,7 +38,9 @@ dotnet test PublishManager.slnx
 一次發版只會監看**一個** workflow run;若偵測到 repo 裡還有其他吃 tag push 的 workflow,新增/編輯專案時會明確警告。
 
 ### 發版來源(從哪個 branch / commit 發版)
-發版面板的「**發版來源**」可填**分支、tag 或 commit sha**;留空就是目前 checkout 的東西。輸入框會提示本機與遠端分支。
+發版面板的「**發版來源**」可填**分支、tag 或 commit sha**;留空就是目前 checkout 的東西。
+
+點一下輸入框就會列出可選項目:**分支**、**tag**(版號由新到舊)、以及**最近 50 筆 commit**(顯示 sha、commit 訊息與日期)。commit 可以直接用訊息內容搜尋 —— 選取後填入的是 sha,後面的訊息只是說明,發版時會自動忽略。
 
 - **不會動你的工作目錄** —— tag 直接打在指定的 commit 上(`git tag -a <tag> <commit>`),不做 checkout
 - 指定來源後,「必須在某分支上才能發版」的限制**自動解除**(那條規則的前提是「發版跟著工作目錄走」)

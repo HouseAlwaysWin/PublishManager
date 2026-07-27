@@ -106,16 +106,39 @@
 
                                     <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                         <TextBlock Text="發版來源" Opacity="0.7" VerticalAlignment="Center" />
-                                        <!-- MinimumPrefixLength=0 so focusing the box lists every
-                                             branch and tag; the default of 1 shows nothing until
-                                             you type, which reads as "no autocomplete". -->
+                                        <!-- MinimumPrefixLength=0 so focusing lists everything; the
+                                             default of 1 shows nothing until you type, which reads
+                                             as "no autocomplete". ValueMemberBinding carries the
+                                             commit subject so a commit can be found by what it
+                                             says; the orchestrator keeps only the leading rev. -->
                                         <AutoCompleteBox Text="{Binding Release.Source}"
                                                          ItemsSource="{Binding Release.SourceSuggestions}"
+                                                         ValueMemberBinding="{Binding SearchText}"
                                                          FilterMode="Contains"
                                                          MinimumPrefixLength="0"
-                                                         MaxDropDownHeight="260"
-                                                         MinWidth="260"
-                                                         PlaceholderText="留空 = 目前 checkout;可填分支 / tag / commit" />
+                                                         MaxDropDownHeight="300"
+                                                         MinWidth="380"
+                                                         PlaceholderText="留空 = 目前 checkout;可填分支 / tag / commit">
+                                            <AutoCompleteBox.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ReleaseSourceOption">
+                                                    <Grid ColumnDefinitions="52,Auto,*,Auto" ColumnSpacing="8">
+                                                        <Border Grid.Column="0" CornerRadius="3" Padding="4,1"
+                                                                Background="#22808080" HorizontalAlignment="Left">
+                                                            <TextBlock Text="{Binding KindLabel}" FontSize="10"
+                                                                       Foreground="{Binding KindBrush}" />
+                                                        </Border>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Rev}" FontWeight="SemiBold"
+                                                                   FontFamily="Cascadia Mono,Consolas,monospace"
+                                                                   VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Detail}" Opacity="0.7"
+                                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                                   IsVisible="{Binding HasDetail}" />
+                                                        <TextBlock Grid.Column="3" Text="{Binding Date}" Opacity="0.45"
+                                                                   FontSize="11" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </AutoCompleteBox.ItemTemplate>
+                                        </AutoCompleteBox>
                                         <TextBlock Text="{Binding Release.Branch, StringFormat='(目前: {0})'}"
                                                    Opacity="0.5" FontSize="11" VerticalAlignment="Center" />
                                     </StackPanel>

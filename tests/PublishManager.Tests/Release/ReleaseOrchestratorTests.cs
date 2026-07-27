@@ -235,6 +235,27 @@ public class ReleaseOrchestratorTests
     }
 
     [Fact]
+    public async Task ASourcePastedWithItsCommitSubject_UsesJustTheRev()
+    {
+        // Picking a commit from the suggestions yields "abc1234 Fix the thing".
+        // No git ref or sha contains a space, so everything after the first one
+        // is description and can be dropped.
+        _git.Tags = ["v1.0.0"];
+        _git.Resolvable["abc1234"] = "abc1234567890";
+        var request = new ReleaseRequest
+        {
+            Project = TagPushProject(),
+            Bump = VersionBump.Patch,
+            Source = "abc1234 Fix the thing",
+        };
+
+        var result = await CreateSut().RunAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Equal(("v1.0.1", "abc1234567890"), Assert.Single(_git.CreatedTagTargets));
+    }
+
+    [Fact]
     public async Task AnUnknownSource_FailsBeforeAnythingIsTagged()
     {
         _git.Tags = ["v1.0.0"];
@@ -571,6 +592,7 @@ sealed class FakeGitService : IGitService
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<CommitInfo>> ListRecentCommitsAsync(string p, int max = 50, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<CommitInfo>>([]);
     public Task<IReadOnlyList<string>> ListBranchesAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
     public Task<string?> ResolveCommitAsync(string p, string rev, CancellationToken ct = default) =>
         Task.FromResult(Resolvable.TryGetValue(rev, out var sha) ? sha : null);

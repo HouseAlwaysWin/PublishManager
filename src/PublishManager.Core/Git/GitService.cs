@@ -58,6 +58,28 @@ public sealed class GitService(IProcessRunner runner, ILogger<GitService> logger
         return [.. branches.Distinct(StringComparer.Ordinal)];
     }
 
+    public async Task<IReadOnlyList<CommitInfo>> ListRecentCommitsAsync(
+        string repoPath, int max = 50, CancellationToken ct = default)
+    {
+        var result = await RunCheckedAsync(repoPath, ct,
+            "log", "--all", $"--max-count={max}", "--date=short", "--format=%h\t%cd\t%s")
+            .ConfigureAwait(false);
+
+        var commits = new List<CommitInfo>();
+        foreach (var line in result.StdOut)
+        {
+            // Split into three so a subject containing tabs stays intact.
+            var parts = line.Split('\t', 3);
+            if (parts.Length < 3 || parts[0].Length == 0)
+                continue;
+
+            DateTimeOffset? date = DateTimeOffset.TryParse(parts[1], out var parsed) ? parsed : null;
+            commits.Add(new CommitInfo(parts[0].Trim(), date, parts[2].Trim()));
+        }
+
+        return commits;
+    }
+
     public async Task<bool> IsWorkingTreeCleanAsync(string repoPath, CancellationToken ct = default)
     {
         var result = await RunCheckedAsync(repoPath, ct, "status", "--porcelain").ConfigureAwait(false);

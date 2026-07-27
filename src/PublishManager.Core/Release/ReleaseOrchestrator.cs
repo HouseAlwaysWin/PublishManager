@@ -58,7 +58,7 @@ public sealed class ReleaseOrchestrator(
                 return Fail(events, ReleaseProgressKeys.Preflight, "Preflight", "工作目錄有未提交的變更,請先 commit 或 stash。", dry);
 
             var branch = await _git.GetCurrentBranchAsync(project.LocalPath, ct);
-            var source = string.IsNullOrWhiteSpace(request.Source) ? null : request.Source.Trim();
+            var source = NormaliseSource(request.Source);
 
             // The "must be on this branch" rule exists because a release follows
             // the working copy. Naming a source says where to release from, so
@@ -442,6 +442,21 @@ public sealed class ReleaseOrchestrator(
 
     private static string ResolveDirectory(string basePath, string dir) =>
         Path.IsPathRooted(dir) ? dir : Path.Combine(basePath, dir);
+
+    /// <summary>
+    /// Reduces a release source to the rev itself. Suggestions carry a commit's
+    /// subject alongside its sha ("abc1234 Fix the thing"); since no branch, tag,
+    /// or sha may contain a space, everything past the first one is description.
+    /// </summary>
+    private static string? NormaliseSource(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            return null;
+
+        var trimmed = source.Trim();
+        var space = trimmed.IndexOfAny([' ', '\t']);
+        return space < 0 ? trimmed : trimmed[..space];
+    }
 
     /// <summary>Abbreviates a sha for display; leaves anything shorter alone.</summary>
     private static string Short(string? sha) =>

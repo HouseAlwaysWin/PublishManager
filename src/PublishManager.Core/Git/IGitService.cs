@@ -19,6 +19,13 @@ public interface IGitService
     /// <summary>Local and remote branch names, offered as release-source suggestions.</summary>
     Task<IReadOnlyList<string>> ListBranchesAsync(string repoPath, CancellationToken ct = default);
 
+    /// <summary>
+    /// The most recent commits across all refs, newest first, so a release can
+    /// be cut from one without having to know its sha by heart.
+    /// </summary>
+    Task<IReadOnlyList<CommitInfo>> ListRecentCommitsAsync(
+        string repoPath, int max = 50, CancellationToken ct = default);
+
     /// <summary>True when there are no uncommitted changes (porcelain status empty).</summary>
     Task<bool> IsWorkingTreeCleanAsync(string repoPath, CancellationToken ct = default);
 

@@ -79,11 +79,8 @@ public partial class ReleaseViewModel : ViewModelBase
 
     public ObservableCollection<ReleaseProgressRowViewModel> Stages { get; } = [];
 
-    /// <summary>
-    /// Branches and tags offered as release-source suggestions — both are valid
-    /// sources. A commit sha is also accepted but cannot be suggested.
-    /// </summary>
-    public ObservableCollection<string> SourceSuggestions { get; } = [];
+    /// <summary>Branches, tags, and recent commits offered as release sources.</summary>
+    public ObservableCollection<ReleaseSourceOption> SourceSuggestions { get; } = [];
     public VersionBump[] Bumps { get; } = Enum.GetValues<VersionBump>();
 
     [ObservableProperty] private Project? _project;
@@ -182,6 +179,7 @@ public partial class ReleaseViewModel : ViewModelBase
             var branch = await _git.GetCurrentBranchAsync(project.LocalPath);
             var tags = await _git.ListTagsAsync(project.LocalPath);
             var branches = await _git.ListBranchesAsync(project.LocalPath);
+            var commits = await _git.ListRecentCommitsAsync(project.LocalPath);
 
             // The user may have switched projects while we were awaiting git;
             // don't overwrite the newly selected project's info with stale data.
@@ -190,12 +188,15 @@ public partial class ReleaseViewModel : ViewModelBase
 
             Branch = branch;
 
-            // Branches first — the common case — then tags, newest version first.
+            // Branches first — the common case — then tags newest version first,
+            // then recent commits so one can be picked by what it says.
             SourceSuggestions.Clear();
             foreach (var name in branches)
-                SourceSuggestions.Add(name);
+                SourceSuggestions.Add(ReleaseSourceOption.ForBranch(name));
             foreach (var tag in OrderTagsNewestFirst(tags, project.TagPrefix))
-                SourceSuggestions.Add(tag);
+                SourceSuggestions.Add(ReleaseSourceOption.ForTag(tag));
+            foreach (var commit in commits)
+                SourceSuggestions.Add(ReleaseSourceOption.ForCommit(commit.ShortSha, commit.Subject, commit.Date));
             var latest = _semver.GetLatest(tags, project.TagPrefix);
             CurrentVersion = latest is null ? "(尚無 tag)" : _semver.ToTag(latest, project.TagPrefix);
             NextVersionPreview = BuildPreview(project, tags);
