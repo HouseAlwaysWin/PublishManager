@@ -8,6 +8,7 @@
         x:Class="PublishManager.Views.ProjectEditorWindow"
         x:DataType="vm:ProjectEditorViewModel"
         Width="640" Height="740"
+        Icon="/Assets/publishmanager.png"
         WindowStartupLocation="CenterOwner"
         Title="{Binding Title}">
 

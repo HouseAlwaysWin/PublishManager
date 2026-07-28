@@ -9,7 +9,7 @@
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="680"
         x:Class="PublishManager.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/publishmanager.png"
         Width="1040" Height="700"
         Title="PublishManager — GitHub Action 發版管理">
 

@@ -8,6 +8,7 @@
         x:Class="PublishManager.Views.ReleaseLedgerWindow"
         x:DataType="vm:ReleaseLedgerViewModel"
         Width="680" Height="540"
+        Icon="/Assets/publishmanager.png"
         WindowStartupLocation="CenterOwner"
         Title="{Binding Title}">
 

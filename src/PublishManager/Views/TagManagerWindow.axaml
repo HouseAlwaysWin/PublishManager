@@ -8,6 +8,7 @@
         x:Class="PublishManager.Views.TagManagerWindow"
         x:DataType="vm:TagManagerViewModel"
         Width="720" Height="640"
+        Icon="/Assets/publishmanager.png"
         WindowStartupLocation="CenterOwner"
         Title="{Binding Title}">
 

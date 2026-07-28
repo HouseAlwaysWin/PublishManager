@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using PublishManager.Core;
 using PublishManager.Core.Diagnostics;
 using PublishManager.Core.Storage;
+using PublishManager.Services;
 using PublishManager.ViewModels;
 using PublishManager.Views;
 
@@ -17,6 +18,8 @@ public partial class App : Application
 {
     /// <summary>Application-wide service provider (composition root).</summary>
     public static IServiceProvider Services { get; private set; } = default!;
+
+    private TrayIconController? _tray;
 
     public override void Initialize()
     {
@@ -45,6 +48,10 @@ public partial class App : Application
             var window = new MainWindow { DataContext = viewModel };
             window.Opened += async (_, _) => await viewModel.InitializeAsync();
             desktop.MainWindow = window;
+
+            // Closing hides to the notification area; the tray menu is the way out.
+            _tray = new TrayIconController(desktop, window);
+            desktop.Exit += (_, _) => _tray?.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();
